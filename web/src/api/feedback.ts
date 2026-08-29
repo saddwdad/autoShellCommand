@@ -25,7 +25,9 @@ export function createFeedback(input: CreateFeedbackInput) {
   return requestAPI.post<{ ok: boolean; id: number }>('/api/feedback', input)
 }
 
-// 拉取最近反馈列表 → GET /api/feedback
-export function listFeedback() {
-  return requestAPI.get<{ list: Feedback[] }>('/api/feedback')
+// 拉取最近反馈列表 → GET /api/feedback（管理员私有，必须带密码）
+export function listFeedback(adminPassword: string) {
+  return requestAPI.get<{ list: Feedback[] }>('/api/feedback', {
+    'X-Admin-Password': adminPassword,
+  })
 }

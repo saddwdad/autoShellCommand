@@ -35,8 +35,16 @@ feedbackRoute.post('/', async (c) => {
   return c.json({ ok: true, id: feedback.id }, 201)
 })
 
-// GET /api/feedback —— 拉取最近 100 条（给你自己审核用）
+// GET /api/feedback —— 拉取最近 100 条（管理员私有接口，需要密码）
 feedbackRoute.get('/', async (c) => {
+  // 反馈列表里是所有用户提交的反馈，属于私有数据，不能谁都能拉。
+  // 请求头 X-Admin-Password 必须等于 .env 里的 ADMIN_PASSWORD 才放行。
+  // （在 handler 里读 env 而不是模块顶部读，是为了避免模块加载顺序导致读不到）
+  const adminPassword = process.env.ADMIN_PASSWORD
+  if (!adminPassword || c.req.header('X-Admin-Password') !== adminPassword) {
+    return c.json({ error: '没有权限查看反馈列表' }, 401)
+  }
+
   const list = await prisma.feedback.findMany({
     orderBy: { id: 'desc' },
     take: 100,

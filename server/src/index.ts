@@ -4,6 +4,14 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { feedbackRoute } from './routes/feedback'
 
+// 加载 server/.env 到 process.env（Node 21.7+ 内置，不用装 dotenv）。
+// .env 不存在（比如刚 clone 还没配）就忽略，走环境变量兜底。
+try {
+  process.loadEnvFile()
+} catch {
+  // 忽略：没配 .env 时，ADMIN_PASSWORD 等配置为空，接口会按“拒绝访问”处理
+}
+
 const app = new Hono()
 
 // 这里就是你实习时「从来没管过」的跨域——现在你要亲手处理它。
@@ -20,3 +28,4 @@ const port = Number(process.env.PORT) || 3000
 console.log(`🚀 服务端已启动：http://localhost:${port}`)
 
 serve({ fetch: app.fetch, port })
+
