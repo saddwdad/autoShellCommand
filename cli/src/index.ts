@@ -1,9 +1,9 @@
 // CLI 入口：dsh "意图" [--platform linux|macos|windows]
-// 流程：解析参数 → 读本机 key → 调 DeepSeek → 打印命令。
+// 流程：解析参数 → 读本机 config（active provider + key）→ 调对应厂商 → 打印命令。
 // 全程不经过 server（server 是否在线都不影响生成）。
 import { parseArgs } from 'node:util'
 import { readConfig } from './lib/config'
-import { generateCommand } from './lib/deepseek'
+import { generateCommand, PROVIDERS } from './lib/llm'
 
 // process.platform 的原始值映射成统一的 platform 名
 function detectPlatform(): string {
@@ -43,16 +43,39 @@ async function main(): Promise<void> {
   const platform = values.platform ?? detectPlatform()
 
   const config = readConfig()
-  const apiKey = config.deepseekApiKey
-  if (!apiKey) {
-    console.error('未检测到 DeepSeek API Key。')
-    console.error('请先在浏览器设置页填入 key（会写进 ~/.autoshell/config.json）。')
+  const active = config.active
+  if (!active) {
+    console.error('尚未配置任何 provider。请先在浏览器设置页选择 provider 并填入 key。')
     process.exitCode = 1
     return
   }
 
+  const providerConfig = config.providers[active]
+  if (!providerConfig || !providerConfig.apiKey) {
+    console.error(`当前 provider「${active}」未配置 key，请到设置页配置。`)
+    process.exitCode = 1
+    return
+  }
+
+  // 解析 baseURL / model：custom 从 config 拿，其余查 provider 表
+  let baseURL: string
+  let model: string
+  let label: string
+  if (active === 'custom') {
+    baseURL = providerConfig.baseURL ?? ''
+    model = providerConfig.model ?? ''
+    label = '自定义'
+  } else {
+    const meta = PROVIDERS.find((p) => p.id === active)
+    baseURL = meta?.baseURL ?? ''
+    model = meta?.model ?? ''
+    label = meta?.label ?? active
+  }
+
+  console.error(`[dsh] 使用 provider: ${label}`)
+
   try {
-    const command = await generateCommand(apiKey, intent, platform)
+    const command = await generateCommand(baseURL, model, providerConfig.apiKey, intent, platform)
     console.log(command)
   } catch (e) {
     console.error(e instanceof Error ? e.message : '生成失败')

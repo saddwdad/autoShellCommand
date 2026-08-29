@@ -7,17 +7,37 @@ import { join } from 'node:path'
 
 export const CONFIG_PATH = join(homedir(), '.autoshell', 'config.json')
 
+export interface ProviderConfig {
+  apiKey: string
+  // baseURL / model 只有 custom provider 需要
+  baseURL?: string
+  model?: string
+}
+
 export interface Config {
-  deepseekApiKey?: string
+  active: string
+  providers: Record<string, ProviderConfig>
+}
+
+// 兼容旧格式 { deepseekApiKey: "..." }，读到时迁移成新结构。
+function migrate(raw: unknown): Config {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const obj = raw as Record<string, unknown>
+    if (typeof obj.deepseekApiKey === 'string') {
+      return { active: 'deepseek', providers: { deepseek: { apiKey: obj.deepseekApiKey } } }
+    }
+    if (typeof obj.active === 'string' && obj.providers && typeof obj.providers === 'object') {
+      return obj as unknown as Config
+    }
+  }
+  return { active: '', providers: {} }
 }
 
 // 读配置。文件不存在 / 内容损坏都返回空对象，让调用方按「没配 key」处理。
 export function readConfig(): Config {
   try {
-    const raw = readFileSync(CONFIG_PATH, 'utf-8')
-    const parsed = JSON.parse(raw)
-    return typeof parsed === 'object' && parsed !== null ? (parsed as Config) : {}
+    return migrate(JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')))
   } catch {
-    return {}
+    return { active: '', providers: {} }
   }
 }
