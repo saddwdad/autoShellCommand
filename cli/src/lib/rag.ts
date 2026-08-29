@@ -5,6 +5,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { pipeline, env } from '@huggingface/transformers'
+import { hashEntry, loadVectorCache, saveVectorCache, type CachedEntry } from './vector-cache'
 
 // HuggingFace 在国内经常连不上，切到镜像站（模型下载和缓存都走这里）。
 // 如果你的网络能直连 huggingface.co，删掉这行即可。
@@ -58,26 +59,56 @@ export async function retrieve(
   const entries = loadLibrary()
   if (entries.length === 0) return []
 
+  const cache = loadVectorCache(MODEL_ID)
+
+  // 找出缺向量的条目，只对它们批量 embed（其余直接复用缓存）
+  const missing = entries.filter((e) => !cache.has(hashEntry(e.intent, e.platform, e.command)))
+
+  const extractor = await getExtractor()
+
+  if (missing.length > 0) {
+    const vecs = await extractor(
+      missing.map((e) => e.intent),
+      { pooling: 'mean', normalize: true },
+    )
+    const dim = vecs.data.length / missing.length
+    missing.forEach((e, i) => {
+      const key = hashEntry(e.intent, e.platform, e.command)
+      cache.set(key, {
+        key,
+        intent: e.intent,
+        platform: e.platform,
+        command: e.command,
+        vector: Array.from(vecs.data.slice(i * dim, (i + 1) * dim)),
+      })
+    })
+  }
+
+  console.error(`[dsh] 向量缓存：命中 ${entries.length - missing.length} / 新增 ${missing.length}`)
+
+  // 只保留当前库里的条目（清掉已删除的旧缓存），且只在有变化时才落盘
+  const current = entries
+    .map((e) => cache.get(hashEntry(e.intent, e.platform, e.command)))
+    .filter((c): c is CachedEntry => c !== undefined)
+  if (missing.length > 0 || cache.size !== entries.length) {
+    saveVectorCache(MODEL_ID, current)
+  }
+
   // 优先同平台（同平台命令才真正有用），不足 topK 再用其它平台兜底
   const samePlatform = entries.filter((e) => e.platform === platform)
   const candidates = samePlatform.length >= topK ? samePlatform : entries
 
-  const extractor = await getExtractor()
   const q = await extractor(intent, { pooling: 'mean', normalize: true })
   const qVec = q.data
   const dim = qVec.length
 
-  // 批量向量化所有候选意图（返回 [N, dim] 平铺成一个 Float32Array）
-  const c = await extractor(
-    candidates.map((e) => e.intent),
-    { pooling: 'mean', normalize: true },
-  )
-  const cVec = c.data
-
   // 归一化后点积 = 余弦相似度
-  const scored = candidates.map((entry, i) => {
+  const scored = candidates.map((entry) => {
+    const cached = cache.get(hashEntry(entry.intent, entry.platform, entry.command))
+    const vec = cached?.vector
+    if (!vec) return { entry, score: -Infinity }
     let dot = 0
-    for (let d = 0; d < dim; d++) dot += qVec[d] * cVec[i * dim + d]
+    for (let d = 0; d < dim; d++) dot += qVec[d] * vec[d]
     return { entry, score: dot }
   })
 
