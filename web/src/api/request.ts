@@ -24,6 +24,7 @@ interface RequestAPI {
   <T = unknown>(url: string, options?: RequestOptions): Promise<T>
   get<T = unknown>(url: string, headers?: Record<string, string>): Promise<T>
   post<T = unknown>(url: string, body: unknown): Promise<T>
+  put<T = unknown>(url: string, body: unknown): Promise<T>
 }
 
 // 让抛出的 Error 额外带上 HTTP 状态码，方便上层区分 401（无权限）这类情况
@@ -66,5 +67,6 @@ const requestAPI: RequestAPI = async function <T>(url: string, options: RequestO
 requestAPI.get = <T>(url: string, headers?: Record<string, string>) =>
   requestAPI<T>(url, { method: 'GET', headers })
 requestAPI.post = <T>(url: string, body: unknown) => requestAPI<T>(url, { method: 'POST', body })
+requestAPI.put = <T>(url: string, body: unknown) => requestAPI<T>(url, { method: 'PUT', body })
 
 export default requestAPI

@@ -1,0 +1,19 @@
+{
+  "name": "autoshell-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "autoshell 命令行工具：自然语言 → 命令（读本机 key，直接调 DeepSeek）",
+  "bin": {
+    "dsh": "src/index.ts"
+  },
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}
