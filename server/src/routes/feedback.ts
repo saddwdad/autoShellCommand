@@ -2,6 +2,7 @@
 // 你操作的是「对象」，Prisma 在背后替你生成 SQL。
 import { Hono } from 'hono'
 import { prisma } from '../db'
+import { appendToLibrary } from '../lib/library'
 
 export const feedbackRoute = new Hono()
 
@@ -30,6 +31,16 @@ feedbackRoute.post('/', async (c) => {
       note: body.note ?? null,
     },
   })
+
+  // 用户填了「期望的正确命令」= 一组验证过的「意图 → 命令」，
+  // 顺手沉淀进本地命令库（供 CLI 做 RAG 检索），去重后追加。
+  if (feedback.expectedCommand) {
+    appendToLibrary({
+      intent: feedback.intent,
+      platform: feedback.platform,
+      command: feedback.expectedCommand,
+    })
+  }
 
   // 201 = 创建成功，把新记录的 id 返回给前端
   return c.json({ ok: true, id: feedback.id }, 201)

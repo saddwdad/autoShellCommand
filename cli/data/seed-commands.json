@@ -1,0 +1,82 @@
+[
+  { "intent": "找出大于 100M 的文件", "platform": "linux", "command": "find . -type f -size +100M" },
+  { "intent": "找出大于 100M 的文件", "platform": "macos", "command": "find . -type f -size +100M" },
+  { "intent": "找出大于 100M 的文件", "platform": "windows", "command": "powershell -Command \"Get-ChildItem . -Recurse -File | Where-Object Length -gt 100MB\"" },
+
+  { "intent": "查看磁盘占用情况", "platform": "linux", "command": "df -h" },
+  { "intent": "查看磁盘占用情况", "platform": "macos", "command": "df -h" },
+  { "intent": "查看磁盘占用情况", "platform": "windows", "command": "wmic logicaldisk get size,freespace,caption" },
+
+  { "intent": "查看当前目录下各文件大小", "platform": "linux", "command": "du -sh * | sort -h" },
+  { "intent": "查看当前目录下各文件大小", "platform": "macos", "command": "du -sh * | sort -h" },
+  { "intent": "查看当前目录下各文件大小", "platform": "windows", "command": "powershell -Command \"Get-ChildItem | Sort-Object Length -Descending | Select-Object Name,Length\"" },
+
+  { "intent": "查看某个端口被谁占用", "platform": "linux", "command": "lsof -i :8080" },
+  { "intent": "查看某个端口被谁占用", "platform": "macos", "command": "lsof -i :8080" },
+  { "intent": "查看某个端口被谁占用", "platform": "windows", "command": "netstat -ano | findstr :8080" },
+
+  { "intent": "杀掉占用某个端口的进程", "platform": "linux", "command": "kill $(lsof -t -i:8080)" },
+  { "intent": "杀掉占用某个端口的进程", "platform": "macos", "command": "kill $(lsof -t -i:8080)" },
+  { "intent": "杀掉占用某个端口的进程", "platform": "windows", "command": "for /f \"tokens=5\" %a in ('netstat -ano ^| findstr :8080') do taskkill /F /PID %a" },
+
+  { "intent": "查看所有进程", "platform": "linux", "command": "ps aux" },
+  { "intent": "查看所有进程", "platform": "macos", "command": "ps aux" },
+  { "intent": "查看所有进程", "platform": "windows", "command": "tasklist" },
+
+  { "intent": "按名字杀掉进程", "platform": "linux", "command": "pkill -f 进程名" },
+  { "intent": "按名字杀掉进程", "platform": "macos", "command": "pkill -f 进程名" },
+  { "intent": "按名字杀掉进程", "platform": "windows", "command": "taskkill /F /IM 进程名.exe" },
+
+  { "intent": "解压 tar.gz 文件", "platform": "linux", "command": "tar -xzf 文件.tar.gz" },
+  { "intent": "解压 tar.gz 文件", "platform": "macos", "command": "tar -xzf 文件.tar.gz" },
+  { "intent": "解压 zip 文件", "platform": "linux", "command": "unzip 文件.zip" },
+  { "intent": "解压 zip 文件", "platform": "windows", "command": "powershell -Command \"Expand-Archive 文件.zip -DestinationPath .\"" },
+  { "intent": "压缩成 tar.gz", "platform": "linux", "command": "tar -czf 输出.tar.gz 目录/" },
+  { "intent": "压缩成 tar.gz", "platform": "macos", "command": "tar -czf 输出.tar.gz 目录/" },
+  { "intent": "压缩目录成 zip", "platform": "windows", "command": "powershell -Command \"Compress-Archive -Path 目录 -DestinationPath 输出.zip\"" },
+
+  { "intent": "按名字查找文件", "platform": "linux", "command": "find . -name \"*.log\"" },
+  { "intent": "按名字查找文件", "platform": "macos", "command": "find . -name \"*.log\"" },
+  { "intent": "按名字查找文件", "platform": "windows", "command": "dir /s /b *.log" },
+
+  { "intent": "递归删除某个后缀的文件", "platform": "linux", "command": "find . -name \"*.log\" -delete" },
+  { "intent": "递归删除某个后缀的文件", "platform": "macos", "command": "find . -name \"*.log\" -delete" },
+
+  { "intent": "查看文件前几行", "platform": "linux", "command": "head -n 20 文件" },
+  { "intent": "查看文件前几行", "platform": "macos", "command": "head -n 20 文件" },
+  { "intent": "实时查看文件尾部", "platform": "linux", "command": "tail -f 文件" },
+  { "intent": "实时查看文件尾部", "platform": "macos", "command": "tail -f 文件" },
+
+  { "intent": "给文件加执行权限", "platform": "linux", "command": "chmod +x 文件" },
+  { "intent": "给文件加执行权限", "platform": "macos", "command": "chmod +x 文件" },
+
+  { "intent": "查看环境变量", "platform": "linux", "command": "printenv" },
+  { "intent": "查看环境变量", "platform": "macos", "command": "printenv" },
+  { "intent": "查看环境变量", "platform": "windows", "command": "set" },
+
+  { "intent": "查看系统信息", "platform": "linux", "command": "uname -a" },
+  { "intent": "查看系统信息", "platform": "windows", "command": "systeminfo" },
+
+  { "intent": "查看内存占用", "platform": "linux", "command": "free -h" },
+  { "intent": "查看内存占用", "platform": "macos", "command": "vm_stat" },
+
+  { "intent": "复制目录", "platform": "linux", "command": "cp -r 源目录 目标目录" },
+  { "intent": "复制目录", "platform": "macos", "command": "cp -r 源目录 目标目录" },
+  { "intent": "移动或重命名文件", "platform": "linux", "command": "mv 源 目标" },
+  { "intent": "移动或重命名文件", "platform": "macos", "command": "mv 源 目标" },
+
+  { "intent": "查看当前所在目录", "platform": "linux", "command": "pwd" },
+  { "intent": "查看当前所在目录", "platform": "macos", "command": "pwd" },
+  { "intent": "查看当前所在目录", "platform": "windows", "command": "cd" },
+
+  { "intent": "列出当前目录所有文件", "platform": "linux", "command": "ls -la" },
+  { "intent": "列出当前目录所有文件", "platform": "macos", "command": "ls -la" },
+  { "intent": "列出当前目录所有文件", "platform": "windows", "command": "dir" },
+
+  { "intent": "查看 git 状态", "platform": "linux", "command": "git status" },
+  { "intent": "查看 git 状态", "platform": "macos", "command": "git status" },
+  { "intent": "查看 git 状态", "platform": "windows", "command": "git status" },
+  { "intent": "查看最近提交记录", "platform": "linux", "command": "git log --oneline -10" },
+  { "intent": "查看最近提交记录", "platform": "macos", "command": "git log --oneline -10" },
+  { "intent": "查看最近提交记录", "platform": "windows", "command": "git log --oneline -10" }
+]

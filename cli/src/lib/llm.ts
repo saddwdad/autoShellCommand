@@ -35,7 +35,15 @@ export async function generateCommand(
   apiKey: string,
   intent: string,
   platform: string,
+  examples: { intent: string; command: string }[] = [],
 ): Promise<string> {
+  // 有历史相似示例时，作为 few-shot 塞进 user message，让模型照着正确命令来
+  const exampleBlock = examples.length
+    ? `\n\n历史相似示例（意图 → 命令）：\n${examples
+        .map((e, i) => `${i + 1}. ${e.intent} → ${e.command}`)
+        .join('\n')}`
+    : ''
+
   const res = await fetch(`${baseURL}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -46,7 +54,7 @@ export async function generateCommand(
       model,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `平台：${platform}\n意图：${intent}` },
+        { role: 'user', content: `平台：${platform}\n意图：${intent}${exampleBlock}` },
       ],
       temperature: 0,
     }),

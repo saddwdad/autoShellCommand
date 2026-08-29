@@ -4,6 +4,7 @@
 import { parseArgs } from 'node:util'
 import { readConfig } from './lib/config'
 import { generateCommand, PROVIDERS } from './lib/llm'
+import { retrieve } from './lib/rag'
 
 // process.platform 的原始值映射成统一的 platform 名
 function detectPlatform(): string {
@@ -29,6 +30,7 @@ async function main(): Promise<void> {
     args: process.argv.slice(2),
     options: {
       platform: { type: 'string' },
+      debug: { type: 'boolean' },
     },
     allowPositionals: true,
   })
@@ -74,8 +76,17 @@ async function main(): Promise<void> {
 
   console.error(`[dsh] 使用 provider: ${label}`)
 
+  // RAG：从命令库检索相似示例，作为 few-shot 喂给模型
+  const examples = await retrieve(intent, platform)
+  if (values.debug) {
+    console.error('[dsh] 检索到的相似示例：')
+    for (const [i, e] of examples.entries()) {
+      console.error(`  ${i + 1}. ${e.intent} → ${e.command}`)
+    }
+  }
+
   try {
-    const command = await generateCommand(baseURL, model, providerConfig.apiKey, intent, platform)
+    const command = await generateCommand(baseURL, model, providerConfig.apiKey, intent, platform, examples)
     console.log(command)
   } catch (e) {
     console.error(e instanceof Error ? e.message : '生成失败')
