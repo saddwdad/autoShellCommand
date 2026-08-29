@@ -16,7 +16,5 @@
     "tsx": "^4.20.0",
     "typescript": "^5.9.0"
   },
-  "dependencies": {
-    "@huggingface/transformers": "^4.2.0"
-  }
+  "dependencies": {}
 }

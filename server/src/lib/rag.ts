@@ -1,19 +1,18 @@
 // RAG 检索：把用户意图和本地命令库里的每条 intent 都向量化，取最相似的 top-k，
-// 作为 few-shot 示例喂给 LLM。用 transformers.js 在本地跑 embedding，不依赖云端。
+// 作为 few-shot 示例喂给 LLM。用 transformers.js 在 server 进程内跑 embedding，
+// 模型常驻内存（懒加载 + 启动预热），CLI 通过 /api/retrieve 调它。
 import { readFileSync } from 'node:fs'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { pipeline, env } from '@huggingface/transformers'
+import { readLibrary } from './library'
 import { hashEntry, loadVectorCache, saveVectorCache, type CachedEntry } from './vector-cache'
 
 // HuggingFace 在国内经常连不上，切到镜像站（模型下载和缓存都走这里）。
 // 如果你的网络能直连 huggingface.co，删掉这行即可。
 env.remoteHost = 'https://hf-mirror.com/'
 
-// 种子库随 CLI 发布（相对本文件的位置）；本地反馈库在用户主目录下。
+// 种子库随 server 发布（相对本文件的位置）；反馈库复用 library.ts 的 readLibrary。
 const SEED_PATH = fileURLToPath(new URL('../../data/seed-commands.json', import.meta.url))
-const LIBRARY_PATH = join(homedir(), '.autoshell', 'library.json')
 
 const MODEL_ID = 'Xenova/bge-small-zh-v1.5'
 
@@ -23,7 +22,7 @@ interface CommandEntry {
   command: string
 }
 
-// 命令库 = 种子 + 本地反馈库
+// 命令库 = 种子 + 本地反馈库（server 收到 feedback 时写进 library.json 的那份）
 function loadLibrary(): CommandEntry[] {
   const entries: CommandEntry[] = []
   try {
@@ -31,24 +30,32 @@ function loadLibrary(): CommandEntry[] {
   } catch {
     // 种子文件读不到就只用反馈库
   }
-  try {
-    entries.push(...(JSON.parse(readFileSync(LIBRARY_PATH, 'utf-8')) as CommandEntry[]))
-  } catch {
-    // 本地库不存在则忽略
-  }
+  entries.push(...readLibrary())
   return entries
 }
 
-// 懒加载 embedding 模型（每次运行只加载一次）
+// 懒加载 embedding 模型（进程内只加载一次）
 type TensorLike = { data: Float32Array }
 type Extractor = (text: string | string[], opts?: Record<string, unknown>) => Promise<TensorLike>
 
 let extractorPromise: Promise<unknown> | null = null
 function getExtractor(): Promise<Extractor> {
   if (!extractorPromise) {
-    extractorPromise = pipeline('feature-extraction', MODEL_ID)
+    extractorPromise = pipeline('feature-extraction', MODEL_ID).catch((err) => {
+      // 加载失败必须重置，否则会永远复用这个 rejected promise，检索就再也起不来了
+      extractorPromise = null
+      throw err
+    })
   }
   return extractorPromise as Promise<Extractor>
+}
+
+// 启动预热：把模型载入内存。失败不阻断 server 启动，首次 /api/retrieve 会懒加载兜底。
+export function warmUp(): Promise<void> {
+  return getExtractor().then(
+    () => console.log('✅ embedding 模型已加载'),
+    (err) => console.warn('⚠️ embedding 模型预热失败（首次检索会重试）：', err?.message ?? err),
+  )
 }
 
 export async function retrieve(
@@ -84,7 +91,7 @@ export async function retrieve(
     })
   }
 
-  console.error(`[dsh] 向量缓存：命中 ${entries.length - missing.length} / 新增 ${missing.length}`)
+  console.error(`[embed] 向量缓存：命中 ${entries.length - missing.length} / 新增 ${missing.length}`)
 
   // 只保留当前库里的条目（清掉已删除的旧缓存），且只在有变化时才落盘
   const current = entries

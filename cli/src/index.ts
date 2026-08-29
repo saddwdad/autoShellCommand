@@ -4,7 +4,7 @@
 import { parseArgs } from 'node:util'
 import { readConfig } from './lib/config'
 import { generateCommand, PROVIDERS } from './lib/llm'
-import { retrieve } from './lib/rag'
+import { retrieve } from './lib/retrieve'
 
 // process.platform 的原始值映射成统一的 platform 名
 function detectPlatform(): string {

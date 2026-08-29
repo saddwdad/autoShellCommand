@@ -4,6 +4,8 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { feedbackRoute } from './routes/feedback'
 import { configRoute } from './routes/config'
+import { retrieveRoute } from './routes/retrieve'
+import { warmUp } from './lib/rag'
 
 // 加载 server/.env 到 process.env（Node 21.7+ 内置，不用装 dotenv）。
 // .env 不存在（比如刚 clone 还没配）就忽略，走环境变量兜底。
@@ -28,10 +30,17 @@ app.route('/api/feedback', feedbackRoute)
 // 挂载 key 存储路由：浏览器设置页填的 DeepSeek key 从这里写进 config.json
 app.route('/api/config', configRoute)
 
+// 挂载检索路由：CLI 生成命令前从这里拿 RAG 相似示例（模型常驻本进程内存）
+app.route('/api/retrieve', retrieveRoute)
+
 const port = Number(process.env.PORT) || 3000
 // 只监听本机回环 127.0.0.1：
 // 这个服务能覆盖用户 key、反馈列表是私有数据，不能让局域网其他人访问。
 console.log(`🚀 服务端已启动：http://localhost:${port}`)
 
 serve({ fetch: app.fetch, port, hostname: '127.0.0.1' })
+
+// 启动后后台预热 embedding 模型（载入内存）。fire-and-forget：不阻塞启动，
+// 失败打警告即可，首次 /api/retrieve 会懒加载兜底。
+void warmUp()
 

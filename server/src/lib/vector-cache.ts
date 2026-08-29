@@ -1,5 +1,5 @@
 // 向量缓存：把命令库里每条 intent 的 embedding 算一次、落到磁盘，
-// 下次只 embed 新增/变化的条目，避免每次运行都对全库重新向量化。
+// 下次只 embed 新增/变化的条目，避免每次都对全库重新向量化。
 // 缓存只做加速，不影响检索结果（缺了随时删掉重建）。
 import { createHash } from 'node:crypto'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
