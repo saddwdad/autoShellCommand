@@ -1,0 +1,32 @@
+// Prisma schema —— 你「不用写 SQL」的来源。
+// 这个文件是数据库结构的唯一真相（single source of truth）：
+// Prisma 读它 → 生成类型安全的 client → 你就能写 prisma.feedback.create() 了。
+
+generator client {
+  provider = "prisma-client-js"
+  // 生成的 client 默认输出到 node_modules/@prisma/client，
+  // 代码里 import { PrismaClient } from '@prisma/client' 即可使用。
+}
+
+datasource db {
+  provider = "sqlite"
+  // file:../data/feedback.db 是相对路径，相对的是这个 schema 文件所在的 prisma/ 目录，
+  // 所以 ../data/feedback.db 实际指向 server/data/feedback.db（和之前手写 SQL 同一个位置）。
+  // 生产项目会改成 url = env("DATABASE_URL") 从环境变量读，而不是写死。
+  url = "file:../data/feedback.db"
+}
+
+// 一个 model = 一张表。字段名用 camelCase（JS 惯例），
+// @map 把字段映射到数据库里的 snake_case 列名（数据库惯例），
+// 这样代码和数据库各自用自己领域的惯例，互不迁就。
+model Feedback {
+  id              Int      @id @default(autoincrement())
+  intent          String // 用户输入的自然语言意图，比如「找出大文件」
+  platform        String // linux / macos / windows
+  wrongCommand    String   @map("wrong_command") // AI 给出的（用户觉得不对的）命令
+  expectedCommand String?  @map("expected_command") // 用户期望的正确命令（可空）
+  note            String? // 用户补充说明
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("feedback") // 表名用全小写 feedback（Prisma 默认会用模型名 Feedback）
+}

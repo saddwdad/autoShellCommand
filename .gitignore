@@ -1,0 +1,21 @@
+# 依赖
+node_modules/
+
+# 构建产物
+dist/
+
+# 数据库文件（本地数据不提交）
+*.db
+*.db-journal
+*.sqlite
+
+# 环境变量（含密钥，绝不提交）
+.env
+.env.local
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志
+*.log

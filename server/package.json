@@ -1,0 +1,23 @@
+{
+  "name": "autoshell-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "autoshell 的反馈收集服务端（学服务端的第一个后端）",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.0",
+    "@prisma/client": "^6.19.3",
+    "hono": "^4.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "prisma": "^6.19.3",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}
