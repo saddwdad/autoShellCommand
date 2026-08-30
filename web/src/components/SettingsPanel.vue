@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import { getConfig, saveProvider, setActiveProvider } from '../api/config'
+import { getConfig, saveProvider, setActiveProvider, setAutoExecute } from '../api/config'
 
 // provider 列表（只做展示用，baseURL/model 在 CLI/server 各自的 registry 里也有）
 const PROVIDERS = [
@@ -29,6 +29,9 @@ const model = ref('')
 const saving = ref(false)
 const switching = ref(false)
 
+// Tab 补全后是否自动执行（true = 补全并回车；false = 只补全，手动回车）
+const autoExecute = ref(false)
+
 const selectedIsCustom = computed(() => selectedProvider.value === 'custom')
 
 function isConfigured(id: string): boolean {
@@ -39,6 +42,7 @@ async function loadConfig() {
   try {
     const data = await getConfig()
     active.value = data.active
+    autoExecute.value = !!data.autoExecute
     const set = new Set<string>()
     for (const [id, meta] of Object.entries(data.providers)) {
       set.add(id)
@@ -102,6 +106,17 @@ async function switchProvider(id: string) {
   }
 }
 
+async function toggleAutoExecute(checked: boolean) {
+  try {
+    await setAutoExecute(checked)
+    autoExecute.value = checked
+    message.success(checked ? '已开启：Tab 补全后自动执行' : '已关闭：Tab 只补全命令')
+  } catch {
+    message.error('保存失败，请先启动本地服务端')
+    autoExecute.value = !checked // 失败回滚
+  }
+}
+
 onMounted(loadConfig)
 </script>
 
@@ -126,6 +141,13 @@ onMounted(loadConfig)
             <a-tag v-else style="margin-left: 4px">未配置</a-tag>
           </a-radio>
         </a-radio-group>
+      </a-form-item>
+
+      <a-form-item label="Tab 补全后">
+        <a-switch :checked="autoExecute" @change="toggleAutoExecute" />
+        <span style="margin-left: 12px; color: #888">
+          {{ autoExecute ? '自动执行（补全并回车,请谨慎使用！）' : '只补全命令（手动回车）' }}
+        </span>
       </a-form-item>
 
       <a-divider />

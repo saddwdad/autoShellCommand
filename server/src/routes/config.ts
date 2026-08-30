@@ -20,7 +20,7 @@ configRoute.get('/', (c) => {
       ...(p.model ? { model: p.model } : {}),
     }
   }
-  return c.json({ active: config.active, providers })
+  return c.json({ active: config.active, providers, autoExecute: config.autoExecute === true })
 })
 
 // PUT /api/config/provider/:id —— 存某个 provider 的 key（merge 进现有 config）
@@ -71,6 +71,20 @@ configRoute.put('/active', async (c) => {
   }
 
   config.active = provider
+  writeConfig(config)
+  return c.json({ ok: true })
+})
+
+// PUT /api/config/autoExecute —— 设置 Tab 补全后是否自动执行
+configRoute.put('/autoExecute', async (c) => {
+  const body = await c.req.json().catch(() => null)
+  const enabled = body && typeof body === 'object' ? (body as { enabled?: unknown }).enabled : undefined
+  if (typeof enabled !== 'boolean') {
+    return c.json({ error: '缺少字段：enabled（boolean）' }, 400)
+  }
+
+  const config = readConfig()
+  config.autoExecute = enabled
   writeConfig(config)
   return c.json({ ok: true })
 })

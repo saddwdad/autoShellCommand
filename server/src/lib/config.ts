@@ -20,6 +20,8 @@ export interface ProviderConfig {
 export interface Config {
   active: string
   providers: Record<string, ProviderConfig>
+  // Tab 补全后是否自动执行：false = 只补全命令（默认），true = 补全并回车执行
+  autoExecute?: boolean
 }
 
 // 兼容旧格式 { deepseekApiKey: "..." } —— 读到时迁移成新结构，用户已存的 key 不丢。

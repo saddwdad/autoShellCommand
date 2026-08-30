@@ -6,6 +6,7 @@ import requestAPI from './request'
 export interface ConfigView {
   active: string
   providers: Record<string, { baseURL?: string; model?: string }>
+  autoExecute: boolean
 }
 
 export function getConfig(): Promise<ConfigView> {
@@ -21,4 +22,8 @@ export function saveProvider(
 
 export function setActiveProvider(id: string): Promise<{ ok: boolean }> {
   return requestAPI.put<{ ok: boolean }>('/api/config/active', { provider: id })
+}
+
+export function setAutoExecute(enabled: boolean): Promise<{ ok: boolean }> {
+  return requestAPI.put<{ ok: boolean }>('/api/config/autoExecute', { enabled })
 }

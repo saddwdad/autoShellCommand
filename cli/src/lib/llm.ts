@@ -21,7 +21,9 @@ export const PROVIDERS: ProviderMeta[] = [
 ]
 
 const SYSTEM_PROMPT =
-  '你是一个命令行助手。只输出命令本身，不要解释、不要用 markdown 代码块、不要加多余文字。如果无法确定，输出最合理的单条命令。'
+  '你是一个命令行助手。只输出命令本身，不要解释、不要用 markdown 代码块、不要加多余文字。' +
+  '严格按给定的 Shell 语法生成命令：PowerShell 用 cmdlet（cd 直接跟路径、不要用 /d，删除用 Remove-Item，列目录用 Get-ChildItem）；cmd 用 cd /d、del、dir；bash/zsh 用 cd、rm、find。' +
+  '如果无法确定，输出最合理的单条命令。'
 
 function stripFence(text: string): string {
   // 模型偶尔会把命令包进 ```bash ... ``` 围栏，这里剥掉。
@@ -35,6 +37,7 @@ export async function generateCommand(
   apiKey: string,
   intent: string,
   platform: string,
+  shell: string,
   examples: { intent: string; command: string }[] = [],
 ): Promise<string> {
   // 有历史相似示例时，作为 few-shot 塞进 user message，让模型照着正确命令来
@@ -54,7 +57,7 @@ export async function generateCommand(
       model,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `平台：${platform}\n意图：${intent}${exampleBlock}` },
+        { role: 'user', content: `平台：${platform}\nShell：${shell}\n意图：${intent}${exampleBlock}` },
       ],
       temperature: 0,
     }),
