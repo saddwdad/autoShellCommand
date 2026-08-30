@@ -11,17 +11,23 @@
 // 注意：这几个必须「调用时才读」process.env，不能提成模块顶层常量。
 // 因为 process.loadEnvFile() 是在 import 之后才执行的（ESM 里 import 先于一切代码），
 // 若在模块加载时就把值抓成常量，会固化成一个 undefined，导致「配了 key 也读不到」。
+// 公开配置内联为默认值（anon key 本来就公开、随包分发安全），env 仍可覆盖。
+// 只有 service key 是机密，必须从 ~/.autoshell/.env 或 process.env 读，绝不进包。
+const DEFAULT_SUPABASE_URL = 'https://daeoaivqyuuwqmdpundo.supabase.co'
+const DEFAULT_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRhZW9haXZxeXV1d3FtZHB1bmRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgwNzQ2NzcsImV4cCI6MjEwMzY1MDY3N30.Psz5Pnnxt5RZxImHfi2c8NmjmRBwNIv6x24EkNM6lyE'
+
 function supabaseUrl(): string {
-  return process.env.SUPABASE_URL ?? ''
+  return process.env.SUPABASE_URL ?? DEFAULT_SUPABASE_URL
 }
 function anonKey(): string {
-  return process.env.SUPABASE_ANON_KEY ?? ''
+  return process.env.SUPABASE_ANON_KEY ?? DEFAULT_ANON_KEY
 }
 function serviceKey(): string {
   return process.env.SUPABASE_SERVICE_KEY ?? ''
 }
 
-// 云是否已配好：没配就整体降级成「离线也能用」（反馈只写本地、不拉共享库）。
+// 云默认已配好（URL / anon key 内联为默认值），除非显式把 env 置空才会降级成离线。
 export function cloudConfigured(): boolean {
   return Boolean(supabaseUrl() && anonKey())
 }

@@ -5,6 +5,13 @@ import { AntDesignVueResolver } from 'unplugin-vue-components/resolvers'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // 开发期代理：npm run dev 时页面跑在 5173，/api 请求转发到本地 daemon（3000）。
+  // 打包后页面由 daemon 同源托管，不再需要这个代理。
+  server: {
+    proxy: {
+      '/api': 'http://localhost:3000',
+    },
+  },
   plugins: [
     vue(),
     // 按需加载：模板里的 <a-button>、<a-input> 等组件会被这个插件自动转换成

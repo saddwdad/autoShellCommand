@@ -1,4 +1,4 @@
-// 命令生成接口：薄客户端 dsh 把「意图」POST 到这里，daemon 在本机读 key、做 RAG、调 LLM。
+// 命令生成接口：薄客户端 asf 把「意图」POST 到这里，daemon 在本机读 key、做 RAG、调 LLM。
 // key 只在这台机器上（readConfig 读 ~/.autoshell/config.json），不上云、不经过任何外部服务。
 // 常驻进程 = 复用到 DeepSeek 的 TLS 连接，embedding 也一直热着。
 import { Hono } from 'hono'

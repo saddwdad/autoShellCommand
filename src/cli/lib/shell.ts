@@ -1,6 +1,6 @@
-// shell 集成片段：把 Tab 键绑到「读当前行 → 交给 dsh → 用命令替换整行」。
-// 通过 `dsh shell-init <powershell|bash>` 打印，用户贴进 $PROFILE / ~/.bashrc 即可。
-// dsh 的诊断信息走 stderr、命令走 stdout，所以钩子里压掉 stderr 只拿命令本身。
+// shell 集成片段：把 Tab 键绑到「读当前行 → 交给 asf → 用命令替换整行」。
+// 通过 `asf shell-init <powershell|bash>` 打印，用户贴进 $PROFILE / ~/.bashrc 即可。
+// asf 的诊断信息走 stderr、命令走 stdout，所以钩子里压掉 stderr 只拿命令本身。
 
 const POWERSHELL_SNIPPET = String.raw`# autoshell: Tab = AI command completion (type intent, then Tab)
 
@@ -40,13 +40,13 @@ Set-PSReadLineKeyHandler -Key Tab -ScriptBlock {
         [Microsoft.PowerShell.PSConsoleReadLine]::TabCompleteNext()
         return
     }
-    # autoExecute mode: fill the command AND run it (dsh config set autoExecute true)
-    $auto = (& dsh config get autoExecute 2>$null) -eq 'true'
-    # dsh emits UTF-8; decode as UTF-8 so Chinese in the command is not mojibake
+    # autoExecute mode: fill the command AND run it (asf config set autoExecute true)
+    $auto = (& asf config get autoExecute 2>$null) -eq 'true'
+    # asf emits UTF-8; decode as UTF-8 so Chinese in the command is not mojibake
     $prev = [Console]::OutputEncoding
     [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     try {
-        $cmd = (& dsh $line --shell powershell 2>$null) -join ' '
+        $cmd = (& asf $line --shell powershell 2>$null) -join ' '
     } finally {
         [Console]::OutputEncoding = $prev
     }
@@ -80,7 +80,7 @@ Set-PSReadLineKeyHandler -Key Tab -ScriptBlock {
 const BASH_SNIPPET = `# autoshell: Tab = AI command completion (type intent, then Tab)
 _autoshell_ai_tab() {
     local cmd
-    cmd="$(command dsh "$READLINE_LINE" --shell bash 2>/dev/null)"
+    cmd="$(command asf "$READLINE_LINE" --shell bash 2>/dev/null)"
     if [ -n "$cmd" ]; then
         READLINE_LINE="$cmd"
         READLINE_POINT="\${#cmd}"

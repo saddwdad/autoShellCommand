@@ -45,7 +45,7 @@ export function readConfig(): Config {
   }
 }
 
-// 整文件覆盖写（CLI 侧用，比如 dsh config set autoExecute）。merge 逻辑在调用方。
+// 整文件覆盖写（CLI 侧用，比如 asf config set autoExecute）。merge 逻辑在调用方。
 export function writeConfig(config: Config): void {
   mkdirSync(CONFIG_DIR, { recursive: true })
   writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2))

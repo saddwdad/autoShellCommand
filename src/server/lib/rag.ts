@@ -1,18 +1,20 @@
 // RAG 检索：把用户意图和本地命令库里的每条 intent 都向量化，取最相似的 top-k，
 // 作为 few-shot 示例喂给 LLM。用 transformers.js 在 server 进程内跑 embedding，
 // 模型常驻内存（懒加载 + 启动预热），CLI 通过 /api/retrieve 调它。
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { pipeline, env } from '@huggingface/transformers'
 import { readLibrary, readSharedLibrary } from './library'
 import { hashEntry, loadVectorCache, saveVectorCache, type CachedEntry } from './vector-cache'
+import { CONFIG_DIR } from './config'
+import seedCommands from '../../data/seed-commands.json'
 
 // HuggingFace 在国内经常连不上，切到镜像站（模型下载和缓存都走这里）。
 // 如果你的网络能直连 huggingface.co，删掉这行即可。
 env.remoteHost = 'https://hf-mirror.com/'
 
-// 种子库随 server 发布（相对本文件的位置）；反馈库复用 library.ts 的 readLibrary。
-const SEED_PATH = fileURLToPath(new URL('../../data/seed-commands.json', import.meta.url))
+// 模型缓存放到用户目录（~/.autoshell/models），而不是 node_modules 里：
+// 这样 npm 重装 / 升级 autoshell 不会把下好的 embedding 模型一起清掉。
+env.cacheDir = join(CONFIG_DIR, 'models')
 
 const MODEL_ID = 'Xenova/bge-small-zh-v1.5'
 
@@ -26,12 +28,8 @@ interface CommandEntry {
 //        + 云共享库（daemon 从 Supabase 拉下来的 shared-library.json 缓存）
 // 三份来源按 intent|platform|command 去重，只留一份。
 function loadLibrary(): CommandEntry[] {
-  const entries: CommandEntry[] = []
-  try {
-    entries.push(...(JSON.parse(readFileSync(SEED_PATH, 'utf-8')) as CommandEntry[]))
-  } catch {
-    // 种子文件读不到就只用反馈库
-  }
+  // 种子库直接 import 内联：打包时 esbuild 把 JSON 打进 bundle，无运行时读文件路径问题。
+  const entries: CommandEntry[] = [...(seedCommands as CommandEntry[])]
   entries.push(...readLibrary())
   entries.push(...readSharedLibrary())
 

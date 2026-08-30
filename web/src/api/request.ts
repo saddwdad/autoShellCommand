@@ -8,8 +8,9 @@
 //
 // 所有 HTTP 请求都从这里走，组件层不碰 fetch。
 
-// 统一的服务端地址（换环境只改这一处）
-const API_BASE = 'http://localhost:3000'
+// 统一的服务端地址。打包后页面由 daemon 同源托管，这里用相对路径（''），
+// /api/* 直接打到托管页面的 daemon；开发期由 vite proxy 转发（见 vite.config.ts）。
+const API_BASE = ''
 
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE'
 

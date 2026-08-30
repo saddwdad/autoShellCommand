@@ -1,6 +1,6 @@
 // 云同步验证脚本：一条命令验证「写反馈 → 写命令库 → 拉命令库」全链路 + RLS 是否正确。
 //
-// 用法（在 server 目录下）：
+// 用法（在仓库根目录下）：
 //   npx tsx scripts/verify-cloud.ts
 //
 // 它会：
@@ -8,11 +8,13 @@
 //   2. 用 anon key 拉整个命令库，确认标记那条约回来了（证明 insert + select 都通、RLS 放行）
 //   3. 报出云上命令库当前条数
 //   4. 清理测试数据：配了 SUPABASE_SERVICE_KEY 就自动删，否则打印一条 SQL 让你在 Supabase 里手动删
-import { cloudConfigured, pushFeedback, pushLibraryEntry, pullLibrary } from '../src/lib/supabase'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+import { cloudConfigured, pushFeedback, pushLibraryEntry, pullLibrary } from '../src/server/lib/supabase'
 
-// 和 index.ts 一样，加载 server/.env
+// 和 index.ts 一样，加载 ~/.autoshell/.env（SUPABASE_SERVICE_KEY 只在这里配，不进包）
 try {
-  process.loadEnvFile()
+  process.loadEnvFile(join(homedir(), '.autoshell', '.env'))
 } catch {
   // 没 .env 也没关系，走环境变量
 }

@@ -1,8 +1,10 @@
 // CLI 入口：薄客户端。
-// dsh 不再直接调 LLM——它把「意图」POST 给常驻 daemon（127.0.0.1:3000 的 server），
+// asf 不再直接调 LLM——它把「意图」POST 给常驻 daemon（127.0.0.1:3000 的 server），
 // 由 daemon 在本机读 key、做 RAG、调 DeepSeek。key 不出本机，且 daemon 复用 TLS 连接。
 // config get/set 和 shell-init 仍然本地处理，不依赖 daemon 在线。
+import { spawn } from 'node:child_process'
 import { parseArgs } from 'node:util'
+import { fileURLToPath } from 'node:url'
 import { readConfig, writeConfig } from './lib/config'
 import { shellInit } from './lib/shell'
 
@@ -35,9 +37,9 @@ function detectShell(): string {
 }
 
 function printUsage(): void {
-  console.log('用法：dsh "自然语言意图" [--platform windows|macos|linux] [--shell powershell|cmd|bash|zsh]')
-  console.log('示例：dsh "找出大于 100M 的文件"')
-  console.log('      dsh --platform linux --shell bash "列出占用端口的进程"')
+  console.log('用法：asf "自然语言意图" [--platform windows|macos|linux] [--shell powershell|cmd|bash|zsh]')
+  console.log('示例：asf "找出大于 100M 的文件"')
+  console.log('      asf --platform linux --shell bash "列出占用端口的进程"')
 }
 
 async function main(): Promise<void> {
@@ -48,15 +50,16 @@ async function main(): Promise<void> {
       platform: { type: 'string' },
       shell: { type: 'string' },
       debug: { type: 'boolean' },
+      port: { type: 'string' },
     },
     allowPositionals: true,
   })
 
-  // `dsh shell-init <powershell|bash>`：打印 Tab 补全的 shell 片段，不跑生成流程
+  // `asf shell-init <powershell|bash>`：打印 Tab 补全的 shell 片段，不跑生成流程
   if (positionals[0] === 'shell-init') {
     const snippet = shellInit(positionals[1] ?? '')
     if (!snippet) {
-      console.error('用法：dsh shell-init <powershell|bash>')
+      console.error('用法：asf shell-init <powershell|bash>')
       process.exitCode = 1
     } else {
       process.stdout.write(snippet)
@@ -64,7 +67,7 @@ async function main(): Promise<void> {
     return
   }
 
-  // `dsh config get/set autoExecute`：读/写 Tab 补全的自动执行开关（本地文件，不依赖 daemon）
+  // `asf config get/set autoExecute`：读/写 Tab 补全的自动执行开关（本地文件，不依赖 daemon）
   if (positionals[0] === 'config') {
     const op = positionals[1]
     const key = positionals[2]
@@ -73,7 +76,7 @@ async function main(): Promise<void> {
     } else if (op === 'set' && key === 'autoExecute') {
       const val = positionals[3]
       if (val !== 'true' && val !== 'false') {
-        console.error('用法：dsh config set autoExecute <true|false>')
+        console.error('用法：asf config set autoExecute <true|false>')
         process.exitCode = 1
       } else {
         const config = readConfig()
@@ -82,9 +85,24 @@ async function main(): Promise<void> {
         console.log(`autoExecute = ${val}`)
       }
     } else {
-      console.error('用法：dsh config get autoExecute | dsh config set autoExecute <true|false>')
+      console.error('用法：asf config get autoExecute | asf config set autoExecute <true|false>')
       process.exitCode = 1
     }
+    return
+  }
+
+  // `asf serve`：前台起常驻 daemon（把 dist/server.js 作为子进程跑），Ctrl+C 即停。
+  // 顺带在同端口托管前端控制面板，免去单独跑 web dev server。
+  if (positionals[0] === 'serve') {
+    const port = Number(values.port) || 3000
+    const serverPath = fileURLToPath(new URL('./server.js', import.meta.url))
+    const child = spawn(process.execPath, [serverPath], {
+      stdio: 'inherit',
+      env: { ...process.env, PORT: String(port) },
+    })
+    child.on('exit', (code) => {
+      process.exit(code ?? 0)
+    })
     return
   }
 
@@ -118,9 +136,9 @@ async function main(): Promise<void> {
       return
     }
 
-    if (data.label) console.error(`[dsh] 使用 provider: ${data.label}`)
+    if (data.label) console.error(`[asf] 使用 provider: ${data.label}`)
     if (values.debug && data.examples) {
-      console.error('[dsh] 检索到的相似示例：')
+      console.error('[asf] 检索到的相似示例：')
       for (const [i, e] of data.examples.entries()) {
         console.error(`  ${i + 1}. ${e.intent} → ${e.command}`)
       }
@@ -128,7 +146,7 @@ async function main(): Promise<void> {
     console.log(data.command)
   } catch {
     // 网络错误（ECONNREFUSED 等）= daemon 没在跑
-    console.error('autoshell daemon 未运行，请先启动服务端（cd server && npm start）')
+    console.error('autoshell daemon 未运行，请先运行 asf serve')
     process.exitCode = 1
   }
 }

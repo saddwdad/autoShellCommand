@@ -1,0 +1,31 @@
+{
+  "name": "autoshell-ai",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "description": "自然语言 → 命令：一个 npm 包，含 asf 命令 + asf serve 常驻 daemon + 本地控制面板",
+  "bin": {
+    "asf": "dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup && npm --prefix web run build && node scripts/copy-web.mjs",
+    "dev": "tsx watch src/server/index.ts",
+    "typecheck": "tsc --noEmit",
+    "link": "npm run build && npm link",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.0",
+    "@huggingface/transformers": "^4.2.0",
+    "hono": "^4.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsup": "^8.3.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  }
+}
