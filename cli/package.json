@@ -5,14 +5,16 @@
   "type": "module",
   "description": "autoshell 命令行工具：自然语言 → 命令（读本机 key，直接调 DeepSeek）",
   "bin": {
-    "dsh": "src/index.ts"
+    "dsh": "dist/index.js"
   },
   "scripts": {
     "start": "tsx src/index.ts",
+    "build": "tsup",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "tsup": "^8.3.0",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0"
   },

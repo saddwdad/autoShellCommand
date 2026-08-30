@@ -5,6 +5,7 @@ import { parseArgs } from 'node:util'
 import { readConfig } from './lib/config'
 import { generateCommand, PROVIDERS } from './lib/llm'
 import { retrieve } from './lib/retrieve'
+import { shellInit } from './lib/shell'
 
 // process.platform 的原始值映射成统一的 platform 名
 function detectPlatform(): string {
@@ -34,6 +35,18 @@ async function main(): Promise<void> {
     },
     allowPositionals: true,
   })
+
+  // `dsh shell-init <powershell|bash>`：打印 Tab 补全的 shell 片段，不跑生成流程
+  if (positionals[0] === 'shell-init') {
+    const snippet = shellInit(positionals[1] ?? '')
+    if (!snippet) {
+      console.error('用法：dsh shell-init <powershell|bash>')
+      process.exitCode = 1
+    } else {
+      process.stdout.write(snippet)
+    }
+    return
+  }
 
   const intent = positionals.join(' ').trim()
   if (!intent) {
