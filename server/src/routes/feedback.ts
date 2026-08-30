@@ -1,54 +1,61 @@
-// 反馈相关接口。用 Prisma 之后，这个文件里不再出现任何 SQL——
-// 你操作的是「对象」，Prisma 在背后替你生成 SQL。
+// 反馈接口。匿名提交（无登录）。
+//
+// 收一条反馈后做两件事：
+// 1. 如果填了「期望的正确命令」→ 先写进本地命令库（立即用于本机 RAG，不用等云同步），
+//    再上传云共享库（供其它用户下载）。
+// 2. 反馈本体上传云（Supabase feedback 表，匿名）。
+//
+// 云写入是 best-effort：没配 Supabase 或云挂了，本地库已经生效，反馈不丢失。
 import { Hono } from 'hono'
-import { prisma } from '../db'
 import { appendToLibrary } from '../lib/library'
+import { pushFeedback, pushLibraryEntry, pullFeedback } from '../lib/supabase'
 
 export const feedbackRoute = new Hono()
 
-// POST /api/feedback —— 收一条反馈
+// POST /api/feedback —— 收一条反馈（body 字段名是 camelCase，TS 惯例）
 feedbackRoute.post('/', async (c) => {
   const body = await c.req.json().catch(() => null)
 
-  // 基础校验：字段名现在是 camelCase（TS 惯例）
   if (!body || !body.intent || !body.platform || !body.wrongCommand) {
-    return c.json(
-      { error: '缺少必填字段：intent, platform, wrongCommand' },
-      400,
-    )
+    return c.json({ error: '缺少必填字段：intent, platform, wrongCommand' }, 400)
   }
 
-  // 这就是「不写 SQL」的插入：一个 create()，参数就是一个对象。
-  // 对比之前手写的：
-  //   INSERT INTO feedback (...) VALUES (?, ?, ?, ?, ?)  ← 字段拼错要到运行才知道
-  // 现在：字段拼错 → 编译期直接报错，而且有自动补全。
-  const feedback = await prisma.feedback.create({
-    data: {
+  // 用户填了「期望的正确命令」= 一组验证过的「意图 → 命令」：
+  // (a) 本地库立刻沉淀（本机 RAG 马上能用），(b) 上传云共享库（供其它用户下载）。
+  if (body.expectedCommand) {
+    appendToLibrary({
       intent: body.intent,
       platform: body.platform,
-      wrongCommand: body.wrongCommand,
-      expectedCommand: body.expectedCommand ?? null,
-      note: body.note ?? null,
-    },
-  })
-
-  // 用户填了「期望的正确命令」= 一组验证过的「意图 → 命令」，
-  // 顺手沉淀进本地命令库（供 CLI 做 RAG 检索），去重后追加。
-  if (feedback.expectedCommand) {
-    appendToLibrary({
-      intent: feedback.intent,
-      platform: feedback.platform,
-      command: feedback.expectedCommand,
+      command: body.expectedCommand,
     })
   }
 
-  // 201 = 创建成功，把新记录的 id 返回给前端
-  return c.json({ ok: true, id: feedback.id }, 201)
+  // 云写入 best-effort：不阻塞、不影响本地已生效的库。
+  try {
+    await pushFeedback({
+      intent: body.intent,
+      platform: body.platform,
+      wrong_command: body.wrongCommand,
+      expected_command: body.expectedCommand ?? null,
+      note: body.note ?? null,
+    })
+    if (body.expectedCommand) {
+      await pushLibraryEntry({
+        intent: body.intent,
+        platform: body.platform,
+        command: body.expectedCommand,
+      })
+    }
+  } catch (err) {
+    console.warn('⚠️ 反馈写云失败（本地库已更新）：', (err as Error)?.message ?? err)
+  }
+
+  return c.json({ ok: true }, 201)
 })
 
-// GET /api/feedback —— 拉取最近 100 条（管理员私有接口，需要密码）
+// GET /api/feedback —— 拉最近 100 条（管理员私有接口，需要密码 + 服务密钥）
 feedbackRoute.get('/', async (c) => {
-  // 反馈列表里是所有用户提交的反馈，属于私有数据，不能谁都能拉。
+  // 反馈列表是所有用户提交的数据，属于私有数据，不能谁都能拉。
   // 请求头 X-Admin-Password 必须等于 .env 里的 ADMIN_PASSWORD 才放行。
   // （在 handler 里读 env 而不是模块顶部读，是为了避免模块加载顺序导致读不到）
   const adminPassword = process.env.ADMIN_PASSWORD
@@ -56,9 +63,11 @@ feedbackRoute.get('/', async (c) => {
     return c.json({ error: '没有权限查看反馈列表' }, 401)
   }
 
-  const list = await prisma.feedback.findMany({
-    orderBy: { id: 'desc' },
-    take: 100,
-  })
-  return c.json({ list })
+  // 反馈现在存云上，这里从 Supabase 读（需要 service key，绕过 RLS 才能读全部）。
+  try {
+    const list = await pullFeedback(100)
+    return c.json({ list })
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : '拉取反馈失败' }, 500)
+  }
 })

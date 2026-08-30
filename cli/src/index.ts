@@ -1,11 +1,13 @@
-// CLI 入口：dsh "意图" [--platform linux|macos|windows]
-// 流程：解析参数 → 读本机 config（active provider + key）→ 调对应厂商 → 打印命令。
-// 全程不经过 server（server 是否在线都不影响生成）。
+// CLI 入口：薄客户端。
+// dsh 不再直接调 LLM——它把「意图」POST 给常驻 daemon（127.0.0.1:3000 的 server），
+// 由 daemon 在本机读 key、做 RAG、调 DeepSeek。key 不出本机，且 daemon 复用 TLS 连接。
+// config get/set 和 shell-init 仍然本地处理，不依赖 daemon 在线。
 import { parseArgs } from 'node:util'
 import { readConfig, writeConfig } from './lib/config'
-import { generateCommand, PROVIDERS } from './lib/llm'
-import { retrieve } from './lib/retrieve'
 import { shellInit } from './lib/shell'
+
+// daemon 地址：可用 AUTOSHELL_URL 覆盖，默认和 server 一致（127.0.0.1:3000）
+const DAEMON_URL = process.env.AUTOSHELL_URL ?? 'http://127.0.0.1:3000'
 
 // process.platform 的原始值映射成统一的 platform 名
 function detectPlatform(): string {
@@ -39,7 +41,7 @@ function printUsage(): void {
 }
 
 async function main(): Promise<void> {
-  // 解析参数：位置参数（意图）放进 positionals，--platform 放进 values
+  // 解析参数：位置参数（意图）放进 positionals，--platform / --shell 放进 values
   const { positionals, values } = parseArgs({
     args: process.argv.slice(2),
     options: {
@@ -62,7 +64,7 @@ async function main(): Promise<void> {
     return
   }
 
-  // `dsh config get/set autoExecute`：读/写 Tab 补全的自动执行开关（shell 钩子每次 Tab 会查一次）
+  // `dsh config get/set autoExecute`：读/写 Tab 补全的自动执行开关（本地文件，不依赖 daemon）
   if (positionals[0] === 'config') {
     const op = positionals[1]
     const key = positionals[2]
@@ -96,52 +98,37 @@ async function main(): Promise<void> {
   const platform = values.platform ?? detectPlatform()
   const shell = values.shell ?? detectShell()
 
-  const config = readConfig()
-  const active = config.active
-  if (!active) {
-    console.error('尚未配置任何 provider。请先在浏览器设置页选择 provider 并填入 key。')
-    process.exitCode = 1
-    return
-  }
-
-  const providerConfig = config.providers[active]
-  if (!providerConfig || !providerConfig.apiKey) {
-    console.error(`当前 provider「${active}」未配置 key，请到设置页配置。`)
-    process.exitCode = 1
-    return
-  }
-
-  // 解析 baseURL / model：custom 从 config 拿，其余查 provider 表
-  let baseURL: string
-  let model: string
-  let label: string
-  if (active === 'custom') {
-    baseURL = providerConfig.baseURL ?? ''
-    model = providerConfig.model ?? ''
-    label = '自定义'
-  } else {
-    const meta = PROVIDERS.find((p) => p.id === active)
-    baseURL = meta?.baseURL ?? ''
-    model = meta?.model ?? ''
-    label = meta?.label ?? active
-  }
-
-  console.error(`[dsh] 使用 provider: ${label}`)
-
-  // RAG：从命令库检索相似示例，作为 few-shot 喂给模型
-  const examples = await retrieve(intent, platform)
-  if (values.debug) {
-    console.error('[dsh] 检索到的相似示例：')
-    for (const [i, e] of examples.entries()) {
-      console.error(`  ${i + 1}. ${e.intent} → ${e.command}`)
-    }
-  }
-
   try {
-    const command = await generateCommand(baseURL, model, providerConfig.apiKey, intent, platform, shell, examples)
-    console.log(command)
-  } catch (e) {
-    console.error(e instanceof Error ? e.message : '生成失败')
+    const res = await fetch(`${DAEMON_URL}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ intent, platform, shell, debug: values.debug === true }),
+    })
+
+    const data = (await res.json().catch(() => null)) as {
+      command?: string
+      label?: string
+      error?: string
+      examples?: { intent: string; command: string }[]
+    } | null
+
+    if (!res.ok || !data?.command) {
+      console.error(data?.error ?? `daemon 返回异常（HTTP ${res.status}）`)
+      process.exitCode = 1
+      return
+    }
+
+    if (data.label) console.error(`[dsh] 使用 provider: ${data.label}`)
+    if (values.debug && data.examples) {
+      console.error('[dsh] 检索到的相似示例：')
+      for (const [i, e] of data.examples.entries()) {
+        console.error(`  ${i + 1}. ${e.intent} → ${e.command}`)
+      }
+    }
+    console.log(data.command)
+  } catch {
+    // 网络错误（ECONNREFUSED 等）= daemon 没在跑
+    console.error('autoshell daemon 未运行，请先启动服务端（cd server && npm start）')
     process.exitCode = 1
   }
 }

@@ -1,6 +1,8 @@
 // 调各家大模型生成命令。key / baseURL / model 都由调用方传入，这里不做任何存储/转发。
 // 各厂商都是 OpenAI 兼容接口（POST {baseURL}/chat/completions），差别只在 baseURL + model。
 // 用 Node 全局 fetch（Node 18+ 内置，无需装依赖）。
+// 这个文件在常驻 daemon 里跑，进程存活期间 undici 会复用与 DeepSeek 的 keep-alive 连接，
+// 省掉每次 Tab 重连的 TLS 握手（~0.15s）。
 
 export interface ProviderMeta {
   id: string

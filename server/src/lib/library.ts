@@ -7,6 +7,8 @@ import { join } from 'node:path'
 import { CONFIG_DIR } from './config'
 
 export const LIBRARY_PATH = join(CONFIG_DIR, 'library.json')
+// 云共享命令库的本地缓存：daemon 从 Supabase 拉下来存这里，RAG 时和种子/本地反馈库合并。
+export const SHARED_LIBRARY_PATH = join(CONFIG_DIR, 'shared-library.json')
 
 export interface CommandEntry {
   intent: string
@@ -34,4 +36,20 @@ export function appendToLibrary(entry: CommandEntry): void {
   list.push(entry)
   mkdirSync(CONFIG_DIR, { recursive: true })
   writeFileSync(LIBRARY_PATH, JSON.stringify(list, null, 2))
+}
+
+// 读云共享库缓存。文件不存在 / 损坏都返回空数组。
+export function readSharedLibrary(): CommandEntry[] {
+  try {
+    const parsed = JSON.parse(readFileSync(SHARED_LIBRARY_PATH, 'utf-8'))
+    return Array.isArray(parsed) ? (parsed as CommandEntry[]) : []
+  } catch {
+    return []
+  }
+}
+
+// 整份覆盖写共享库缓存（daemon 从云拉完后的结果）。
+export function writeSharedLibrary(entries: CommandEntry[]): void {
+  mkdirSync(CONFIG_DIR, { recursive: true })
+  writeFileSync(SHARED_LIBRARY_PATH, JSON.stringify(entries, null, 2))
 }

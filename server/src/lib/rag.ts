@@ -4,7 +4,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { pipeline, env } from '@huggingface/transformers'
-import { readLibrary } from './library'
+import { readLibrary, readSharedLibrary } from './library'
 import { hashEntry, loadVectorCache, saveVectorCache, type CachedEntry } from './vector-cache'
 
 // HuggingFace 在国内经常连不上，切到镜像站（模型下载和缓存都走这里）。
@@ -23,6 +23,8 @@ interface CommandEntry {
 }
 
 // 命令库 = 种子 + 本地反馈库（server 收到 feedback 时写进 library.json 的那份）
+//        + 云共享库（daemon 从 Supabase 拉下来的 shared-library.json 缓存）
+// 三份来源按 intent|platform|command 去重，只留一份。
 function loadLibrary(): CommandEntry[] {
   const entries: CommandEntry[] = []
   try {
@@ -31,7 +33,15 @@ function loadLibrary(): CommandEntry[] {
     // 种子文件读不到就只用反馈库
   }
   entries.push(...readLibrary())
-  return entries
+  entries.push(...readSharedLibrary())
+
+  const seen = new Set<string>()
+  return entries.filter((e) => {
+    const key = `${e.intent}|${e.platform}|${e.command}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 // 懒加载 embedding 模型（进程内只加载一次）

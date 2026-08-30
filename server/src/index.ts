@@ -5,7 +5,9 @@ import { cors } from 'hono/cors'
 import { feedbackRoute } from './routes/feedback'
 import { configRoute } from './routes/config'
 import { retrieveRoute } from './routes/retrieve'
+import { generateRoute } from './routes/generate'
 import { warmUp } from './lib/rag'
+import { startLibrarySync } from './lib/sync'
 
 // 加载 server/.env 到 process.env（Node 21.7+ 内置，不用装 dotenv）。
 // .env 不存在（比如刚 clone 还没配）就忽略，走环境变量兜底。
@@ -33,6 +35,9 @@ app.route('/api/config', configRoute)
 // 挂载检索路由：CLI 生成命令前从这里拿 RAG 相似示例（模型常驻本进程内存）
 app.route('/api/retrieve', retrieveRoute)
 
+// 挂载命令生成路由：薄客户端 dsh 把意图 POST 到这里，daemon 读 key + RAG + 调 LLM
+app.route('/api/generate', generateRoute)
+
 const port = Number(process.env.PORT) || 3000
 // 只监听本机回环 127.0.0.1：
 // 这个服务能覆盖用户 key、反馈列表是私有数据，不能让局域网其他人访问。
@@ -43,4 +48,7 @@ serve({ fetch: app.fetch, port, hostname: '127.0.0.1' })
 // 启动后后台预热 embedding 模型（载入内存）。fire-and-forget：不阻塞启动，
 // 失败打警告即可，首次 /api/retrieve 会懒加载兜底。
 void warmUp()
+
+// 启动先拉一次云共享命令库，之后每 10 分钟拉一次（合并进 RAG 检索）。
+startLibrarySync()
 
