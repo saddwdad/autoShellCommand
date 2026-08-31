@@ -29,11 +29,11 @@ npm i -g autoshell-ai
 3. 装 Tab 钩子（PowerShell）：
 
    ```powershell
-   asf shell-init powershell   # 打印补全脚本
-   notepad $PROFILE            # 粘贴进去并保存
+   asf shell-init powershell --install   # 直接写入 $PROFILE
    ```
 
-   bash / zsh 同理：`asf shell-init bash` 贴进 `~/.bashrc`，`asf shell-init zsh` 贴进 `~/.zshrc`。
+   bash / zsh 同理：`asf shell-init bash --install` 写进 `~/.bashrc`，`asf shell-init zsh --install` 写进 `~/.zshrc`。
+   （不加 `--install` 则只是打印脚本，方便你检查或手动安装。）
 
    重开一个终端，直接打字 + Tab：
 
@@ -49,7 +49,8 @@ npm i -g autoshell-ai
 asf serve                              # 起 daemon + 控制面板
 asf "列出占用端口的进程"                 # 不装钩子，也能直接生成命令
 asf config set autoExecute true        # Tab 后自动执行（默认只补全）
-asf shell-init powershell              # 打印 Tab 补全脚本（powershell / bash / zsh）
+asf shell-init powershell --install    # 装 Tab 补全（powershell / bash / zsh）
+asf shell-init powershell              # 仅打印补全脚本
 ```
 
 ## 换 provider / 自定义

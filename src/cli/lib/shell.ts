@@ -1,6 +1,11 @@
 // shell 集成片段：把 Tab 键绑到「读当前行 → 交给 asf → 用命令替换整行」。
 // 通过 `asf shell-init <powershell|bash|zsh>` 打印，用户贴进 $PROFILE / ~/.bashrc / ~/.zshrc 即可。
+// 也可 `asf shell-init <shell> --install` 一步直接写进配置文件（见 installShellInit）。
 // asf 的诊断信息走 stderr、命令走 stdout，所以钩子里压掉 stderr 只拿命令本身。
+import { execFileSync } from 'node:child_process'
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { dirname, join } from 'node:path'
 
 const POWERSHELL_SNIPPET = String.raw`# autoshell: Tab = AI command completion (type intent, then Tab)
 
@@ -122,5 +127,69 @@ export function shellInit(shell: string): string {
       return ZSH_SNIPPET
     default:
       return ''
+  }
+}
+
+// PowerShell 的 $PROFILE 路径：让 PowerShell 自己回答最准（5.1 和 7 路径不同，
+// 且尊重用户可能的自定义 $PROFILE 位置）。powershell（5.1）优先，退回 pwsh（7）。
+function getPowerShellProfile(): string | null {
+  const ask = (exe: string): string | null => {
+    try {
+      const out = execFileSync(
+        exe,
+        ['-NoProfile', '-Command', '[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; Write-Output $PROFILE'],
+        { encoding: 'utf8' },
+      )
+      const line = out.split(/\r?\n/).map((s) => s.trim()).find((s) => s.length > 0)
+      return line || null
+    } catch {
+      return null
+    }
+  }
+  return ask('powershell') ?? ask('pwsh')
+}
+
+// 各 shell 的 Tab 补全钩子配置文件路径
+function getProfilePath(shell: string): string | null {
+  switch (shell) {
+    case 'powershell':
+      return getPowerShellProfile()
+    case 'bash':
+      return join(homedir(), '.bashrc')
+    case 'zsh':
+      return join(homedir(), '.zshrc')
+    default:
+      return null
+  }
+}
+
+// 把 Tab 补全脚本直接写进 shell 配置文件，省去「打印 → notepad → 粘贴」。
+// 幂等：已装过（文件里已有 `# autoshell: Tab` 标记）就跳过，不重复追加。
+export function installShellInit(shell: string): { ok: boolean; message: string } {
+  const snippet = shellInit(shell)
+  if (!snippet) return { ok: false, message: `不支持的 shell：${shell || '(空)'}` }
+
+  const profile = getProfilePath(shell)
+  if (!profile) return { ok: false, message: `无法确定 ${shell} 的配置文件路径（powershell 未安装？）` }
+
+  const marker = '# autoshell: Tab'
+  let existing = ''
+  try {
+    if (existsSync(profile)) existing = readFileSync(profile, 'utf8')
+  } catch {
+    // 读不到（权限/编码异常）就当作空文件，继续尝试写；写失败会在下面报错
+  }
+  if (existing.includes(marker)) {
+    return { ok: true, message: `已安装（${profile}），无需重复写入` }
+  }
+
+  try {
+    mkdirSync(dirname(profile), { recursive: true })
+    // 追加前若文件末尾没换行，先补一个，避免脚本和已有内容粘在一起
+    const sep = existing && !existing.endsWith('\n') ? '\n' : ''
+    appendFileSync(profile, sep + snippet + '\n', 'utf8')
+    return { ok: true, message: `已写入 ${profile}，重开终端后生效` }
+  } catch (e) {
+    return { ok: false, message: `写入失败：${(e as Error).message}` }
   }
 }

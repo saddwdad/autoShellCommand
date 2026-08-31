@@ -6,7 +6,11 @@ import { spawn } from 'node:child_process'
 import { parseArgs } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { readConfig, writeConfig } from './lib/config'
-import { shellInit } from './lib/shell'
+import { installShellInit, shellInit } from './lib/shell'
+import pkg from '../../package.json'
+
+// 版本号：esbuild 打包时把 package.json 内联进来，运行时不依赖文件路径。
+const VERSION = pkg.version
 
 // daemon 地址：可用 AUTOSHELL_URL 覆盖，默认和 server 一致（127.0.0.1:3000）
 const DAEMON_URL = process.env.AUTOSHELL_URL ?? 'http://127.0.0.1:3000'
@@ -37,9 +41,23 @@ function detectShell(): string {
 }
 
 function printUsage(): void {
-  console.log('用法：asf "自然语言意图" [--platform windows|macos|linux] [--shell powershell|cmd|bash|zsh]')
-  console.log('示例：asf "找出大于 100M 的文件"')
-  console.log('      asf --platform linux --shell bash "列出占用端口的进程"')
+  console.log(`asf ${VERSION} — 自然语言转 shell 命令`)
+  console.log('')
+  console.log('用法：')
+  console.log('  asf "自然语言意图" [--platform windows|macos|linux] [--shell powershell|cmd|bash|zsh] [--debug]')
+  console.log('  asf serve [--port <端口>]                             启动常驻 daemon + 前端面板')
+  console.log('  asf config get autoExecute                           查看 Tab 补全自动执行开关')
+  console.log('  asf config set autoExecute <true|false>              设置 Tab 补全自动执行开关')
+  console.log('  asf shell-init <powershell|bash|zsh>                 打印 Tab 补全脚本')
+  console.log('  asf shell-init <powershell|bash|zsh> --install        直接写入配置文件（免手动粘贴）')
+  console.log('')
+  console.log('选项：')
+  console.log('  -h, --help     显示帮助')
+  console.log('  -v, --version  显示版本')
+  console.log('')
+  console.log('示例：')
+  console.log('  asf "找出大于 100M 的文件"')
+  console.log('  asf --platform linux --shell bash "列出占用端口的进程"')
 }
 
 async function main(): Promise<void> {
@@ -51,18 +69,41 @@ async function main(): Promise<void> {
       shell: { type: 'string' },
       debug: { type: 'boolean' },
       port: { type: 'string' },
+      version: { type: 'boolean', short: 'v' },
+      help: { type: 'boolean', short: 'h' },
+      install: { type: 'boolean', short: 'i' },
     },
     allowPositionals: true,
   })
 
-  // `asf shell-init <powershell|bash|zsh>`：打印 Tab 补全的 shell 片段，不跑生成流程
+  // `asf -v` / `asf --version`：打印版本号
+  if (values.version) {
+    console.log(VERSION)
+    return
+  }
+
+  // `asf -h` / `asf --help`：打印帮助
+  if (values.help) {
+    printUsage()
+    return
+  }
+
+  // `asf shell-init <powershell|bash|zsh>`：打印 Tab 补全的 shell 片段，不跑生成流程。
+  // 加 `--install` / `-i` 则直接把片段写进 $PROFILE / ~/.bashrc / ~/.zshrc，省去手动粘贴。
   if (positionals[0] === 'shell-init') {
-    const snippet = shellInit(positionals[1] ?? '')
-    if (!snippet) {
-      console.error('用法：asf shell-init <powershell|bash|zsh>')
-      process.exitCode = 1
+    if (values.install) {
+      const r = installShellInit(positionals[1] ?? '')
+      if (r.ok) console.log(r.message)
+      else console.error(r.message)
+      process.exitCode = r.ok ? 0 : 1
     } else {
-      process.stdout.write(snippet)
+      const snippet = shellInit(positionals[1] ?? '')
+      if (!snippet) {
+        console.error('用法：asf shell-init <powershell|bash|zsh> [--install]')
+        process.exitCode = 1
+      } else {
+        process.stdout.write(snippet)
+      }
     }
     return
   }
