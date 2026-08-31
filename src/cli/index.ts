@@ -55,11 +55,11 @@ async function main(): Promise<void> {
     allowPositionals: true,
   })
 
-  // `asf shell-init <powershell|bash>`：打印 Tab 补全的 shell 片段，不跑生成流程
+  // `asf shell-init <powershell|bash|zsh>`：打印 Tab 补全的 shell 片段，不跑生成流程
   if (positionals[0] === 'shell-init') {
     const snippet = shellInit(positionals[1] ?? '')
     if (!snippet) {
-      console.error('用法：asf shell-init <powershell|bash>')
+      console.error('用法：asf shell-init <powershell|bash|zsh>')
       process.exitCode = 1
     } else {
       process.stdout.write(snippet)

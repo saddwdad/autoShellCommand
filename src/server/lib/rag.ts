@@ -2,7 +2,7 @@
 // 作为 few-shot 示例喂给 LLM。用 transformers.js 在 server 进程内跑 embedding，
 // 模型常驻内存（懒加载 + 启动预热），CLI 通过 /api/retrieve 调它。
 import { join } from 'node:path'
-import { pipeline, env } from '@huggingface/transformers'
+import { pipeline, env, LogLevel } from '@huggingface/transformers'
 import { readLibrary, readSharedLibrary } from './library'
 import { hashEntry, loadVectorCache, saveVectorCache, type CachedEntry } from './vector-cache'
 import { CONFIG_DIR } from './config'
@@ -15,6 +15,9 @@ env.remoteHost = 'https://hf-mirror.com/'
 // 模型缓存放到用户目录（~/.autoshell/models），而不是 node_modules 里：
 // 这样 npm 重装 / 升级 autoshell 不会把下好的 embedding 模型一起清掉。
 env.cacheDir = join(CONFIG_DIR, 'models')
+
+// 打印 transformers.js 内部日志（下载 URL、缓存命中等），配合 progress_callback 一起排查下载问题
+env.logLevel = LogLevel.INFO
 
 const MODEL_ID = 'Xenova/bge-small-zh-v1.5'
 
@@ -46,10 +49,31 @@ function loadLibrary(): CommandEntry[] {
 type TensorLike = { data: Float32Array }
 type Extractor = (text: string | string[], opts?: Record<string, unknown>) => Promise<TensorLike>
 
+// 下载/加载进度回调：打印到 stderr，让用户在 asf serve 终端能看到模型到底下没下下来、下到哪
+function logModelProgress(e: any): void {
+  const status = String(e?.status ?? '')
+  const name = String(e?.file ?? e?.name ?? '')
+  if (status === 'progress') {
+    const loaded = Number(e?.loaded ?? 0)
+    const total = Number(e?.total ?? 0)
+    if (total > 0) {
+      const pct = ((loaded / total) * 100).toFixed(1)
+      console.error(`[model] 下载 ${name} ${pct}% (${(loaded / 1048576).toFixed(1)}/${(total / 1048576).toFixed(1)} MB)`)
+    }
+    return
+  }
+  if (status === 'initiate') console.error(`[model] 开始 ${name}`)
+  else if (status === 'download') console.error(`[model] 下载 ${name}`)
+  else if (status === 'done') console.error(`[model] 完成 ${name}`)
+  else if (status === 'ready') console.error(`[model] 模型已就绪`)
+}
+
 let extractorPromise: Promise<unknown> | null = null
 function getExtractor(): Promise<Extractor> {
   if (!extractorPromise) {
-    extractorPromise = pipeline('feature-extraction', MODEL_ID).catch((err) => {
+    extractorPromise = pipeline('feature-extraction', MODEL_ID, {
+      progress_callback: logModelProgress,
+    }).catch((err) => {
       // 加载失败必须重置，否则会永远复用这个 rejected promise，检索就再也起不来了
       extractorPromise = null
       throw err
@@ -60,9 +84,16 @@ function getExtractor(): Promise<Extractor> {
 
 // 启动预热：把模型载入内存。失败不阻断 server 启动，首次 /api/retrieve 会懒加载兜底。
 export function warmUp(): Promise<void> {
+  console.error(
+    `[model] 下载源 ${env.remoteHost}，缓存目录 ${env.cacheDir}，Node ${process.version}，` +
+      `useFS=${env.useFS} useFSCache=${env.useFSCache} useBrowserCache=${env.useBrowserCache}`,
+  )
   return getExtractor().then(
     () => console.log('✅ embedding 模型已加载'),
-    (err) => console.warn('⚠️ embedding 模型预热失败（首次检索会重试）：', err?.message ?? err),
+    (err) => {
+      console.warn('⚠️ embedding 模型预热失败（首次检索会重试）：', err?.message ?? err)
+      console.warn('[model] 完整堆栈：\n' + (err?.stack ?? '(无堆栈)'))
+    },
   )
 }
 

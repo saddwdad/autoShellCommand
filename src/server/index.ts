@@ -54,7 +54,11 @@ const port = Number(process.env.PORT) || 3000
 // 这个服务能覆盖用户 key、反馈列表是私有数据，不能让局域网其他人访问。
 console.log(`🚀 服务端已启动：http://localhost:${port}`)
 
-serve({ fetch: app.fetch, port, hostname: '127.0.0.1' })
+// @hono/node-server 默认会把 globalThis.Response
+// 换成它的轻量级 _Response 子类，导致 transformers.js 里 `response instanceof Response`
+// 判断为 false、模型下载后永远不落盘（报 "Unable to get model file path or buffer"）。
+// 关掉这个覆盖，保持 Node 原生 Response 不被替换。
+serve({ fetch: app.fetch, port, hostname: '127.0.0.1', overrideGlobalObjects: false })
 
 // 启动后后台预热 embedding 模型（载入内存）。fire-and-forget：不阻塞启动，
 // 失败打警告即可，首次 /api/retrieve 会懒加载兜底。

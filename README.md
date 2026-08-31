@@ -33,6 +33,8 @@ npm i -g autoshell-ai
    notepad $PROFILE            # 粘贴进去并保存
    ```
 
+   bash / zsh 同理：`asf shell-init bash` 贴进 `~/.bashrc`，`asf shell-init zsh` 贴进 `~/.zshrc`。
+
    重开一个终端，直接打字 + Tab：
 
    ```powershell
@@ -47,7 +49,7 @@ npm i -g autoshell-ai
 asf serve                              # 起 daemon + 控制面板
 asf "列出占用端口的进程"                 # 不装钩子，也能直接生成命令
 asf config set autoExecute true        # Tab 后自动执行（默认只补全）
-asf shell-init powershell              # 打印 Tab 补全脚本（powershell / bash）
+asf shell-init powershell              # 打印 Tab 补全脚本（powershell / bash / zsh）
 ```
 
 ## 换 provider / 自定义

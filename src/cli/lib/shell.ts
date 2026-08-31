@@ -1,5 +1,5 @@
 // shell 集成片段：把 Tab 键绑到「读当前行 → 交给 asf → 用命令替换整行」。
-// 通过 `asf shell-init <powershell|bash>` 打印，用户贴进 $PROFILE / ~/.bashrc 即可。
+// 通过 `asf shell-init <powershell|bash|zsh>` 打印，用户贴进 $PROFILE / ~/.bashrc / ~/.zshrc 即可。
 // asf 的诊断信息走 stderr、命令走 stdout，所以钩子里压掉 stderr 只拿命令本身。
 
 const POWERSHELL_SNIPPET = String.raw`# autoshell: Tab = AI command completion (type intent, then Tab)
@@ -73,6 +73,11 @@ Set-PSReadLineKeyHandler -Key Tab -ScriptBlock {
         if ($auto) {
             [Microsoft.PowerShell.PSConsoleReadLine]::AcceptLine()
         }
+    } else {
+        # asf returned nothing (daemon down / key not set) - surface it instead of failing silently
+        [Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt()
+        Write-Host '[autoshell] no command generated - check: 1) asf serve running  2) API key configured' -ForegroundColor Yellow
+        [Microsoft.PowerShell.PSConsoleReadLine]::InvokePrompt()
     }
 }
 `
@@ -89,12 +94,32 @@ _autoshell_ai_tab() {
 bind -x '"\\t": _autoshell_ai_tab'
 `
 
+const ZSH_SNIPPET = `# autoshell: Tab = AI command completion (type intent, then Tab)
+_autoshell_ai_tab() {
+    if [[ -z "$BUFFER" ]]; then
+        zle expand-or-complete
+        return
+    fi
+    local cmd
+    cmd="$(command asf "$BUFFER" --shell zsh 2>/dev/null)"
+    if [ -n "$cmd" ]; then
+        BUFFER="$cmd"
+        CURSOR=\${#cmd}
+    fi
+    zle reset-prompt
+}
+zle -N _autoshell_ai_tab
+bindkey '^I' _autoshell_ai_tab
+`
+
 export function shellInit(shell: string): string {
   switch (shell) {
     case 'powershell':
       return POWERSHELL_SNIPPET
     case 'bash':
       return BASH_SNIPPET
+    case 'zsh':
+      return ZSH_SNIPPET
     default:
       return ''
   }
