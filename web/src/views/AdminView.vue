@@ -37,6 +37,17 @@ function enter() {
   loadList()
 }
 
+// 把 UTC 时间转成北京时间显示（YYYY-MM-DD HH:mm:ss）
+function formatBeijingTime(iso: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  const pad = (n: number) => String(n).padStart(2, '0')
+  // 北京时间 = UTC+8，无夏令时，直接加 8 小时再按 UTC 字段读
+  const bj = new Date(d.getTime() + 8 * 60 * 60 * 1000)
+  return `${bj.getUTCFullYear()}-${pad(bj.getUTCMonth() + 1)}-${pad(bj.getUTCDate())} ${pad(bj.getUTCHours())}:${pad(bj.getUTCMinutes())}:${pad(bj.getUTCSeconds())}`
+}
+
 onMounted(() => {
   // 之前存过密码就自动验证一次，成功后 authed 才为 true
   const saved = localStorage.getItem('autoshell.adminPassword')
@@ -75,9 +86,11 @@ onMounted(() => {
         <a-table-column title="ID" data-index="id" :width="60" />
         <a-table-column title="意图" data-index="intent" />
         <a-table-column title="平台" data-index="platform" :width="90" />
-        <a-table-column title="错误命令" data-index="wrongCommand" />
-        <a-table-column title="期望命令" data-index="expectedCommand" />
-        <a-table-column title="时间" data-index="createdAt" :width="180" />
+        <a-table-column title="错误命令" data-index="wrong_command" />
+        <a-table-column title="期望命令" data-index="expected_command" />
+        <a-table-column title="时间" :width="180">
+          <template #default="{ record }">{{ formatBeijingTime(record.created_at) }}</template>
+        </a-table-column>
       </a-table>
     </a-card>
   </div>

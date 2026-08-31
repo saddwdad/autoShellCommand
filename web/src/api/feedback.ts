@@ -6,10 +6,10 @@ export interface Feedback {
   id: number
   intent: string
   platform: string
-  wrongCommand: string
-  expectedCommand: string | null
+  wrong_command: string
+  expected_command: string | null
   note: string | null
-  createdAt: string
+  created_at: string
 }
 
 export interface CreateFeedbackInput {
