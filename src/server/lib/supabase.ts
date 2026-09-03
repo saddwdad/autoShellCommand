@@ -46,6 +46,15 @@ export interface LibraryRow {
   command: string
 }
 
+// 技术栈命令库（云上一条 = 一条命令模板）。params 是可空的占位符说明。
+export interface TechCommandRow {
+  type: string
+  label: string
+  intent: string
+  cmd: string
+  params: string | null
+}
+
 // 基础请求头。写库用 anon key，只有管理员拉反馈列表才用 service key。
 function headers(key: string): Record<string, string> {
   return {
@@ -88,8 +97,26 @@ export async function pullLibrary(): Promise<LibraryRow[]> {
     `${supabaseUrl()}/rest/v1/library?select=intent,platform,command&order=id`,
     { headers: headers(anonKey()) },
   )
-  if (!res.ok) throw new Error(`拉取共享库失败（HTTP ${res.status}）`)
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`拉取共享库失败（HTTP ${res.status}）${body ? `：${body}` : ''}`)
+  }
   const data = (await res.json()) as LibraryRow[]
+  return Array.isArray(data) ? data : []
+}
+
+// 拉整个技术栈命令库（匿名可读），daemon 启动/定期拉下来缓存，检索时和内置知识库合并。
+export async function pullTechCommands(): Promise<TechCommandRow[]> {
+  if (!cloudConfigured()) return []
+  const res = await fetch(
+    `${supabaseUrl()}/rest/v1/tech_commands?select=type,label,intent,cmd,params&order=id`,
+    { headers: headers(anonKey()) },
+  )
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`拉取技术栈命令库失败（HTTP ${res.status}）${body ? `：${body}` : ''}`)
+  }
+  const data = (await res.json()) as TechCommandRow[]
   return Array.isArray(data) ? data : []
 }
 

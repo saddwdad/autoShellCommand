@@ -1,6 +1,6 @@
 {
   "name": "autoshell-ai",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "private": false,
   "type": "module",
   "description": "自然语言 → 命令：一个 npm 包，含 asf 命令 + asf serve 常驻 daemon + 本地控制面板",

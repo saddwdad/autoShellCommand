@@ -11,7 +11,7 @@ import { configRoute } from './routes/config'
 import { retrieveRoute } from './routes/retrieve'
 import { generateRoute } from './routes/generate'
 import { warmUp } from './lib/rag'
-import { startLibrarySync } from './lib/sync'
+import { startCloudSync } from './lib/sync'
 
 // 从用户目录固定读 ~/.autoshell/.env（Node 21.7+ 内置 loadEnvFile，不用装 dotenv）。
 // asf serve 从任意目录起都能读到。里面放机密（ADMIN_PASSWORD / SUPABASE_SERVICE_KEY），
@@ -64,6 +64,6 @@ serve({ fetch: app.fetch, port, hostname: '127.0.0.1', overrideGlobalObjects: fa
 // 失败打警告即可，首次 /api/retrieve 会懒加载兜底。
 void warmUp()
 
-// 启动先拉一次云共享命令库，之后每 10 分钟拉一次（合并进 RAG 检索）。
-startLibrarySync()
+// 启动先拉一次云共享命令库 + 技术栈命令库，之后每 10 分钟拉一次（合并进检索）。
+startCloudSync()
 

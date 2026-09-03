@@ -29,8 +29,14 @@ const SYSTEM_PROMPT =
   '你是一个命令行助手。只输出命令本身，不要解释、不要用 markdown 代码块、不要加多余文字。' +
   '严格按给定的 Shell 语法生成命令：PowerShell 用 cmdlet（cd 直接跟路径、不要用 /d，删除用 Remove-Item，列目录用 Get-ChildItem）；cmd 用 cd /d、del、dir；bash/zsh 用 cd、rm、find。' +
   '如果无法确定，输出最合理的单条命令。' +
-  '你可以调用工具探索工作区，但只有当意图模糊、需要理解项目上下文时才使用；若意图已经明确（如路径跳转、简单文件/目录操作），直接输出命令，不要调用工具。' +
-  '需要探索时：先 list_dir(".") 查看顶层文件，识别项目类型（package.json=Node/前端、pom.xml 或 build.gradle=Java、Cargo.toml=Rust、go.mod=Go、pyproject.toml 或 requirements.txt=Python、Dockerfile 或 docker-compose.yml=容器/部署、Makefile=通用构建），再 read_file 对应关键文件或 README.md 获取具体命令；定位到关键文件就立即读、读完立即输出命令，不要反复 list_dir 遍历。'
+  '先判断意图类型：\n' +
+  '- 简单操作（路径跳转 cd、列目录、查找文件、压缩/解压、git、查看端口等）→ 直接输出命令，不要调用任何工具。\n' +
+  '- 涉及项目/技术栈的构建、打包、运行、测试、部署（如"打包这个项目""构建""跑起来""上线""运行测试""安装依赖"）→ 需要探索工作区，按下面步骤：\n' +
+  '  1. list_dir(".") 查看顶层文件，识别项目类型（package.json=Node/前端、pom.xml 或 build.gradle=Java、Cargo.toml=Rust、go.mod=Go、pyproject.toml 或 requirements.txt=Python、Dockerfile 或 docker-compose.yml=容器/部署）。\n' +
+  '  2. 调用 query_tech_command(意图短语) 获取标准命令模板（如"打包构建项目""上线部署启动服务""运行测试"）。\n' +
+  '  3. 若模板含 {占位符}，read_file 读取对应文件（pom.xml、package.json、README.md 等）填充参数。\n' +
+  '  4. 填充后只输出最终命令。\n' +
+  '注意：项目语境下"打包"指构建/编译（如 mvn package、npm run build），不是压缩文件。'
 
 function stripFence(text: string): string {
   // 模型偶尔会把命令包进 ```bash ... ``` 围栏，这里剥掉。
@@ -105,7 +111,9 @@ async function generateWithTools(
   messages: ChatMessage[],
   cwd: string,
 ): Promise<string> {
-  const maxRounds = 3
+  // 模糊意图最多探索 5 轮：list_dir → read_file → query_tech_command → 再补读 → 出命令。
+  // 简单意图不调用工具，一轮就结束，不受影响。
+  const maxRounds = 5
   for (let round = 0; round < maxRounds; round++) {
     const msg = await chat(baseURL, model, apiKey, messages, TOOL_DEFINITIONS)
     const toolCalls = msg.tool_calls
@@ -119,7 +127,8 @@ async function generateWithTools(
         } catch {
           args = {}
         }
-        const result = executeTool(tc.function.name, args, cwd)
+        console.error(`[llm] 工具调用：${tc.function.name}(${tc.function.arguments ?? ''})`)
+        const result = await executeTool(tc.function.name, args, cwd)
         messages.push({ role: 'tool', tool_call_id: tc.id, content: result })
       }
       continue

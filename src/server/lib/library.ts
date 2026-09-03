@@ -9,11 +9,22 @@ import { CONFIG_DIR } from './config'
 export const LIBRARY_PATH = join(CONFIG_DIR, 'library.json')
 // 云共享命令库的本地缓存：daemon 从 Supabase 拉下来存这里，RAG 时和种子/本地反馈库合并。
 export const SHARED_LIBRARY_PATH = join(CONFIG_DIR, 'shared-library.json')
+// 云技术栈命令库的本地缓存：daemon 从 Supabase 拉下来存这里，技术栈检索时和内置知识库合并。
+export const SHARED_TECH_COMMANDS_PATH = join(CONFIG_DIR, 'shared-tech-commands.json')
 
 export interface CommandEntry {
   intent: string
   platform: string
   command: string
+}
+
+// 技术栈命令库条目（扁平结构，与 tech-commands.json 拍平后的 op 一致）
+export interface TechCommandEntry {
+  type: string
+  label: string
+  intent: string
+  cmd: string
+  params: string
 }
 
 // 读库。文件不存在 / 损坏都返回空数组。
@@ -52,4 +63,20 @@ export function readSharedLibrary(): CommandEntry[] {
 export function writeSharedLibrary(entries: CommandEntry[]): void {
   mkdirSync(CONFIG_DIR, { recursive: true })
   writeFileSync(SHARED_LIBRARY_PATH, JSON.stringify(entries, null, 2))
+}
+
+// 读技术栈命令库缓存。文件不存在 / 损坏都返回空数组。
+export function readSharedTechCommands(): TechCommandEntry[] {
+  try {
+    const parsed = JSON.parse(readFileSync(SHARED_TECH_COMMANDS_PATH, 'utf-8'))
+    return Array.isArray(parsed) ? (parsed as TechCommandEntry[]) : []
+  } catch {
+    return []
+  }
+}
+
+// 整份覆盖写技术栈命令库缓存（daemon 从云拉完后的结果）。
+export function writeSharedTechCommands(entries: TechCommandEntry[]): void {
+  mkdirSync(CONFIG_DIR, { recursive: true })
+  writeFileSync(SHARED_TECH_COMMANDS_PATH, JSON.stringify(entries, null, 2))
 }

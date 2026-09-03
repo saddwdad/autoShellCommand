@@ -1,7 +1,9 @@
 // 文件系统工具：让 LLM 在生成命令前自主探索工作区（list_dir / read_file）。
 // 所有路径都严格限制在 cwd 子树内，并排除敏感/大文件，防止把本机机密交给 LLM。
+// 另有 query_tech_command：查技术栈命令知识库（打包 jar / 上线部署等），见 tech-commands.ts。
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, resolve, sep } from 'node:path'
+import { queryTechCommands } from './tech-commands'
 
 export interface ToolDefinition {
   type: 'function'
@@ -39,6 +41,23 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           path: { type: 'string', description: '要读取的文件路径，相对工作区根目录' },
         },
         required: ['path'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'query_tech_command',
+      description:
+        '查询技术栈命令知识库，返回与意图最相似的命令模板（如打包 jar、上线部署、运行测试等）。' +
+        '当意图涉及项目构建/打包/运行/测试/部署等操作时，必须先调用本工具获取标准命令模板，不要凭空猜测命令。' +
+        '返回的命令模板含 {占位符}，需结合实际文件填充。',
+      parameters: {
+        type: 'object',
+        properties: {
+          intent: { type: 'string', description: '要查询的操作意图，如"打包构建项目"、"上线部署启动服务"' },
+        },
+        required: ['intent'],
       },
     },
   },
@@ -125,10 +144,28 @@ function readFile(cwd: string, rel: string): string {
   return content
 }
 
-export function executeTool(name: string, args: unknown, cwd: string): string {
-  const a = (args && typeof args === 'object' ? args : {}) as { path?: string }
-  const rel = typeof a.path === 'string' ? a.path : '.'
-  if (name === 'list_dir') return listDir(cwd, rel)
-  if (name === 'read_file') return readFile(cwd, rel)
+export async function executeTool(name: string, args: unknown, cwd: string): Promise<string> {
+  const a = (args && typeof args === 'object' ? args : {}) as { path?: string; intent?: string }
+
+  if (name === 'list_dir') return listDir(cwd, typeof a.path === 'string' ? a.path : '.')
+  if (name === 'read_file') return readFile(cwd, typeof a.path === 'string' ? a.path : '.')
+
+  if (name === 'query_tech_command') {
+    const intent = typeof a.intent === 'string' ? a.intent.trim() : ''
+    if (!intent) return '错误：query_tech_command 缺少 intent 参数'
+    try {
+      const hits = await queryTechCommands(intent)
+      if (hits.length === 0) return '知识库中未找到匹配的命令模板'
+      return hits
+        .map(
+          (h) =>
+            `[${h.label}] ${h.intent}\n命令：${h.cmd}${h.params ? `\n参数：${h.params}` : ''}`,
+        )
+        .join('\n\n')
+    } catch (e) {
+      return `错误：查询技术栈知识库失败：${(e as Error).message}`
+    }
+  }
+
   return `错误：未知工具 ${name}`
 }

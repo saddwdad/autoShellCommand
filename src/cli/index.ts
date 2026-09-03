@@ -40,12 +40,47 @@ function detectShell(): string {
   }
 }
 
+// 打开系统默认浏览器。detached + unref 让浏览器进程独立于 CLI，不阻塞 asf serve 运行。
+function openBrowser(url: string): void {
+  let cmd: string
+  let args: string[]
+  if (process.platform === 'win32') {
+    cmd = 'cmd'
+    args = ['/c', 'start', '', url]
+  } else if (process.platform === 'darwin') {
+    cmd = 'open'
+    args = [url]
+  } else {
+    cmd = 'xdg-open'
+    args = [url]
+  }
+  spawn(cmd, args, { stdio: 'ignore', detached: true }).unref()
+}
+
+// 等服务就绪（/api/health 返回 200）后再打开面板，避免浏览器先于服务起来而连不上。
+async function openBrowserWhenReady(port: number): Promise<void> {
+  const url = `http://127.0.0.1:${port}`
+  for (let i = 0; i < 20; i++) {
+    try {
+      const res = await fetch(`${url}/api/health`)
+      if (res.ok) {
+        console.error(`[asf] 已打开控制面板：${url}`)
+        openBrowser(url)
+        return
+      }
+    } catch {
+      // 服务还没起来，下一轮再试
+    }
+    await new Promise((r) => setTimeout(r, 250))
+  }
+}
+
 function printUsage(): void {
   console.log(`asf ${VERSION} — 自然语言转 shell 命令`)
   console.log('')
   console.log('用法：')
   console.log('  asf "自然语言意图" [--platform windows|macos|linux] [--shell powershell|cmd|bash|zsh] [--debug]')
-  console.log('  asf serve [--port <端口>]                             启动常驻 daemon + 前端面板')
+  console.log('  asf serve [--port <端口>] [--no-open]                 启动常驻 daemon + 前端面板（默认自动打开浏览器）')
   console.log('  asf config get autoExecute                           查看 Tab 补全自动执行开关')
   console.log('  asf config set autoExecute <true|false>              设置 Tab 补全自动执行开关')
   console.log('  asf shell-init <powershell|bash|zsh>                 打印 Tab 补全脚本')
@@ -69,6 +104,7 @@ async function main(): Promise<void> {
       shell: { type: 'string' },
       debug: { type: 'boolean' },
       port: { type: 'string' },
+      'no-open': { type: 'boolean' },
       version: { type: 'boolean', short: 'v' },
       help: { type: 'boolean', short: 'h' },
       install: { type: 'boolean', short: 'i' },
@@ -134,6 +170,7 @@ async function main(): Promise<void> {
 
   // `asf serve`：前台起常驻 daemon（把 dist/server.js 作为子进程跑），Ctrl+C 即停。
   // 顺带在同端口托管前端控制面板，免去单独跑 web dev server。
+  // 默认等 daemon 起来后自动打开浏览器面板，`--no-open` 可关掉（如无头环境）。
   if (positionals[0] === 'serve') {
     const port = Number(values.port) || 3000
     const serverPath = fileURLToPath(new URL('./server.js', import.meta.url))
@@ -141,6 +178,9 @@ async function main(): Promise<void> {
       stdio: 'inherit',
       env: { ...process.env, PORT: String(port) },
     })
+    if (!values['no-open']) {
+      void openBrowserWhenReady(port)
+    }
     child.on('exit', (code) => {
       process.exit(code ?? 0)
     })

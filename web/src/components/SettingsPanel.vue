@@ -123,36 +123,8 @@ onMounted(loadConfig)
 <template>
   <a-card title="设置">
     <a-form layout="vertical">
-      <!-- 上半区：当前使用的 provider，点选即切换 -->
-      <a-form-item label="当前使用">
-        <a-radio-group
-          :value="active"
-          :disabled="switching"
-          @change="(e: Event) => switchProvider((e.target as HTMLInputElement).value)"
-        >
-          <a-radio
-            v-for="p in PROVIDERS"
-            :key="p.id"
-            :value="p.id"
-            :disabled="!isConfigured(p.id)"
-          >
-            {{ p.label }}
-            <a-tag v-if="isConfigured(p.id)" color="green" style="margin-left: 4px">已配置</a-tag>
-            <a-tag v-else style="margin-left: 4px">未配置</a-tag>
-          </a-radio>
-        </a-radio-group>
-      </a-form-item>
 
-      <a-form-item label="Tab 补全后">
-        <a-switch :checked="autoExecute" @change="toggleAutoExecute" />
-        <span style="margin-left: 12px; color: #888">
-          {{ autoExecute ? '自动执行（补全并回车,请谨慎使用！）' : '只补全命令（手动回车）' }}
-        </span>
-      </a-form-item>
-
-      <a-divider />
-
-      <!-- 下半区：配置某个 provider 的 key -->
+      <!-- 上半区：配置某个 provider 的 key -->
       <a-form-item label="配置 provider">
         <a-select v-model:value="selectedProvider" style="width: 240px">
           <a-select-option v-for="p in PROVIDERS" :key="p.id" :value="p.id">
@@ -175,6 +147,37 @@ onMounted(loadConfig)
       </a-form-item>
 
       <a-button type="primary" :loading="saving" @click="save">保存</a-button>
+
+      <a-divider />
+
+      <a-form-item label="Tab 补全后">
+        <a-switch :checked="autoExecute" @change="toggleAutoExecute" />
+        <span style="margin-left: 12px; color: #888">
+          {{ autoExecute ? '自动执行（补全并回车,请谨慎使用！）' : '只补全命令（手动回车）' }}
+        </span>
+      </a-form-item>
+
+      <a-divider />
+      
+      <!-- 下半区：当前使用的 provider，点选即切换 -->
+      <a-form-item label="当前使用">
+        <a-radio-group
+          :value="active"
+          :disabled="switching"
+          @change="(e: Event) => switchProvider((e.target as HTMLInputElement).value)"
+        >
+          <a-radio
+            v-for="p in PROVIDERS"
+            :key="p.id"
+            :value="p.id"
+            :disabled="!isConfigured(p.id)"
+          >
+            {{ p.label }}
+            <a-tag v-if="isConfigured(p.id)" color="green" style="margin-left: 4px">已配置</a-tag>
+            <a-tag v-else style="margin-left: 4px">未配置</a-tag>
+          </a-radio>
+        </a-radio-group>
+      </a-form-item>
     </a-form>
 
     <a-alert
