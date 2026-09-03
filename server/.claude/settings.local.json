@@ -22,7 +22,16 @@
       "Bash(taskkill //F //PID 13408 //PID 9200)",
       "Read(//c/Users/lmr20/**)",
       "Bash(cmd //c \"rmdir /s /q C:\\\\Users\\\\lmr20\\\\autoshell-test-ssr\")",
-      "Bash(ls -d /c/Users/lmr20/autoshell-test-ssr)"
+      "Bash(ls -d /c/Users/lmr20/autoshell-test-ssr)",
+      "Read(//e/Desktop/项目/autoshell/autoShellCommand/**)",
+      "Bash(sed -n '1,40p' node_modules/@hono/node-server/dist/index.mjs)",
+      "Bash(dot -V)",
+      "Bash(winget --version)",
+      "Bash(choco --version)",
+      "Bash(scoop --version)",
+      "Bash(winget install *)",
+      "Bash(\"/c/Program Files/Graphviz/bin/dot.exe\" -Tpng docs/architecture.dot -o docs/architecture.png)",
+      "Bash(\"/c/Program Files/Graphviz/bin/dot.exe\" -Tsvg docs/architecture.dot -o docs/architecture.svg)"
     ]
   }
 }

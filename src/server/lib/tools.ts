@@ -1,6 +1,7 @@
 // 文件系统工具：让 LLM 在生成命令前自主探索工作区（list_dir / read_file）。
 // 所有路径都严格限制在 cwd 子树内，并排除敏感/大文件，防止把本机机密交给 LLM。
 // 另有 query_tech_command：查技术栈命令知识库（打包 jar / 上线部署等），见 tech-commands.ts。
+// 另有 emit_command：模型提交最终命令的结构化输出工具，由 llm.ts 拦截解析，不走 executeTool。
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { basename, resolve, sep } from 'node:path'
 import { queryTechCommands } from './tech-commands'
@@ -13,6 +14,9 @@ export interface ToolDefinition {
     parameters: Record<string, unknown>
   }
 }
+
+// 结构化输出工具名：模型用它提交最终命令（见 llm.ts）。
+export const EMIT_COMMAND_TOOL = 'emit_command'
 
 // 工具声明（OpenAI function-calling 格式），llm.ts 直接拿去做 body.tools
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
@@ -58,6 +62,22 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
           intent: { type: 'string', description: '要查询的操作意图，如"打包构建项目"、"上线部署启动服务"' },
         },
         required: ['intent'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: EMIT_COMMAND_TOOL,
+      description:
+        '提交最终命令。这是你回答的唯一方式：生成命令后必须调用本工具，把命令放进 command 参数。' +
+        '禁止用纯文本输出命令，禁止在 command 里放解释文字。',
+      parameters: {
+        type: 'object',
+        properties: {
+          command: { type: 'string', description: '完整的一条 shell 命令（只放命令本身，不带解释）' },
+        },
+        required: ['command'],
       },
     },
   },

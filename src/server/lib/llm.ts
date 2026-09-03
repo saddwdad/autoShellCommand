@@ -5,7 +5,7 @@
 // 省掉每次 Tab 重连的 TLS 握手（~0.15s）。
 // 生成命令前允许 LLM 用工具（list_dir/read_file）自主探索工作区，见 tools.ts。
 
-import { executeTool, TOOL_DEFINITIONS, type ToolDefinition } from './tools'
+import { executeTool, TOOL_DEFINITIONS, EMIT_COMMAND_TOOL, type ToolDefinition } from './tools'
 
 export interface ProviderMeta {
   id: string
@@ -26,22 +26,56 @@ export const PROVIDERS: ProviderMeta[] = [
 ]
 
 const SYSTEM_PROMPT =
-  '你是一个命令行助手。只输出命令本身，不要解释、不要用 markdown 代码块、不要加多余文字。' +
+  '你是一个命令行助手，把自然语言意图翻译成一条 shell 命令。' +
+  '你回答的唯一方式是调用 emit_command 工具，把最终命令放进 command 参数；禁止用纯文本输出命令，禁止解释、禁止推理过程、禁止任何中英文说明、禁止 markdown 代码块。' +
   '严格按给定的 Shell 语法生成命令：PowerShell 用 cmdlet（cd 直接跟路径、不要用 /d，删除用 Remove-Item，列目录用 Get-ChildItem）；cmd 用 cd /d、del、dir；bash/zsh 用 cd、rm、find。' +
   '如果无法确定，输出最合理的单条命令。' +
   '先判断意图类型：\n' +
-  '- 简单操作（路径跳转 cd、列目录、查找文件、压缩/解压、git、查看端口等）→ 直接输出命令，不要调用任何工具。\n' +
+  '- 简单操作（路径跳转 cd、列目录、查找文件、压缩/解压、git、查看端口等）→ 直接调用 emit_command 输出命令，不要调用任何探索工具。\n' +
   '- 涉及项目/技术栈的构建、打包、运行、测试、部署（如"打包这个项目""构建""跑起来""上线""运行测试""安装依赖"）→ 需要探索工作区，按下面步骤：\n' +
   '  1. list_dir(".") 查看顶层文件，识别项目类型（package.json=Node/前端、pom.xml 或 build.gradle=Java、Cargo.toml=Rust、go.mod=Go、pyproject.toml 或 requirements.txt=Python、Dockerfile 或 docker-compose.yml=容器/部署）。\n' +
   '  2. 调用 query_tech_command(意图短语) 获取标准命令模板（如"打包构建项目""上线部署启动服务""运行测试"）。\n' +
   '  3. 若模板含 {占位符}，read_file 读取对应文件（pom.xml、package.json、README.md 等）填充参数。\n' +
-  '  4. 填充后只输出最终命令。\n' +
+  '  4. 探索结束后，调用 emit_command 提交最终命令（command 参数只放命令本身，不要复述你发现了什么）。\n' +
   '注意：项目语境下"打包"指构建/编译（如 mvn package、npm run build），不是压缩文件。'
 
 function stripFence(text: string): string {
   // 模型偶尔会把命令包进 ```bash ... ``` 围栏，这里剥掉。
   const match = text.trim().match(/^```[a-zA-Z]*\n([\s\S]*?)\n?```$/)
   return match ? match[1].trim() : text.trim()
+}
+
+// 命令词白名单：用于在「模型多输出的解释文字」里定位真正的命令起点。
+// 单行时靠「句末标点 + 空白 + 命令词」分界；多行时判断最后一行是否以命令词开头。
+const COMMAND_WORD =
+  /\b(?:cd|ls|dir|pwd|rm|rmdir|del|mv|cp|ren|rename|cat|type|echo|grep|find|mkdir|touch|chmod|chown|tar|zip|unzip|git|npm|npx|yarn|pnpm|node|python3?|pip3?|mvn|gradle|java|javac|cargo|rustc|go|docker|docker-compose|curl|wget|ps|kill|taskkill|netstat|lsof|ssh|scp|rsync|make|cmake|brew|apt|apt-get|sudo|systemctl|service|start|open|code|vim|nano|df|du|free|top|hostname|whoami|date|time|ping|ipconfig|adb|ffmpeg|clear|cls|which|where|Get-ChildItem|Remove-Item|New-Item|Copy-Item|Move-Item|Set-Location|Start-Process|Invoke-WebRequest|Write-Output)\b/
+
+function startsWithCommand(s: string): boolean {
+  const m = s.match(COMMAND_WORD)
+  return m !== null && m.index === 0
+}
+
+// 模型偶尔不守「只输出命令」的规矩，会在命令前加解释文字（中英文都有）。
+// 这里做一次尽力而为的剥离：先剥 markdown 围栏，再从「解释 + 命令」里取命令本体。
+function extractCommand(text: string): string {
+  const s = stripFence(text).trim()
+  if (!s) return s
+
+  // 多行：命令通常单独成行，取最后一行（前提是它确实像命令，避免误伤多行命令）
+  const lines = s.split('\n').map((l) => l.trim()).filter(Boolean)
+  if (lines.length > 1) {
+    const last = lines[lines.length - 1]
+    return startsWithCommand(last) ? last : s
+  }
+
+  // 单行「解释 + 命令」：从最后一个「句末标点 + 空白 + 命令词」分界处截断
+  const boundary = /[。！？.!?]\s+/g
+  let cut = -1
+  let m: RegExpExecArray | null
+  while ((m = boundary.exec(s))) {
+    if (startsWithCommand(s.slice(boundary.lastIndex))) cut = boundary.lastIndex
+  }
+  return cut > 0 ? s.slice(cut).trim() : s
 }
 
 interface ChatMessage {
@@ -118,15 +152,32 @@ async function generateWithTools(
     const msg = await chat(baseURL, model, apiKey, messages, TOOL_DEFINITIONS)
     const toolCalls = msg.tool_calls
 
+    // 原始输出日志：content 可能夹带模型写的解释/推理（即使它同时调用了工具），原样打印便于排查
+    if (msg.content && msg.content.trim()) {
+      console.error(`[llm] 原始 content：${msg.content}`)
+    }
+
     if (toolCalls && toolCalls.length > 0) {
       messages.push({ role: 'assistant', content: msg.content ?? '', tool_calls: toolCalls })
       for (const tc of toolCalls) {
-        let args: unknown = {}
+        let args: Record<string, unknown> = {}
         try {
           args = JSON.parse(tc.function.arguments ?? '{}')
         } catch {
           args = {}
         }
+
+        // emit_command 是结构化输出：命令从参数里取，绝不混进解释文字，也不走 executeTool
+        if (tc.function.name === EMIT_COMMAND_TOOL) {
+          const command = typeof args.command === 'string' ? args.command.trim() : ''
+          if (command) {
+            console.error(`[llm] 最终命令（emit_command）：${command}`)
+            return command
+          }
+          messages.push({ role: 'tool', tool_call_id: tc.id, content: '错误：command 不能为空，请给出有效命令' })
+          continue
+        }
+
         console.error(`[llm] 工具调用：${tc.function.name}(${tc.function.arguments ?? ''})`)
         const result = await executeTool(tc.function.name, args, cwd)
         messages.push({ role: 'tool', tool_call_id: tc.id, content: result })
@@ -134,9 +185,10 @@ async function generateWithTools(
       continue
     }
 
+    // 模型没用工具、直接返回纯文本 → 兜底剥解释文字
     const content = msg.content
     if (!content) throw new Error('模型返回为空，未生成命令')
-    return stripFence(content)
+    return extractCommand(content)
   }
   throw new Error('探索轮数超限，仍未生成命令')
 }
@@ -151,7 +203,9 @@ async function generatePlain(
   const msg = await chat(baseURL, model, apiKey, messages)
   const content = msg.content
   if (!content) throw new Error('模型返回为空，未生成命令')
-  return stripFence(content)
+  // 原始输出日志：降级路径（无工具）也原样打印，便于排查模型是否夹带解释文字
+  console.error(`[llm] 原始 content：${content}`)
+  return extractCommand(content)
 }
 
 export async function generateCommand(

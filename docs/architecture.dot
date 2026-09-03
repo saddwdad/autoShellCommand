@@ -1,0 +1,62 @@
+// autoshell-ai 架构图 —— 用 Graphviz 渲染：
+//   dot -Tpng docs/architecture.dot -o docs/architecture.png
+//   dot -Tsvg docs/architecture.dot -o docs/architecture.svg
+digraph autoshell {
+  // ===== 全局样式 =====
+  graph [
+    rankdir=TB,
+    bgcolor="transparent",
+    fontname="Microsoft YaHei",
+    splines=spline,
+    pad=0.5,
+    nodesep=0.6,
+    ranksep=0.7
+  ];
+  node [
+    fontname="Microsoft YaHei",
+    fontsize=12,
+    shape=box,
+    style="rounded,filled",
+    fillcolor="#ffffff",
+    color="#94a3b8",
+    penwidth=1.2
+  ];
+  edge [
+    fontname="Microsoft YaHei",
+    fontsize=10,
+    color="#64748b",
+    fontcolor="#475569",
+    penwidth=1.2
+  ];
+
+  // ===== 客户端 =====
+  cli [label="终端 · asf CLI（薄客户端）\n\n输入：自然语言意图 + 当前工作区", fillcolor="#e0f2fe", color="#0284c7", penwidth=2];
+
+  // ===== 本机 daemon =====
+  subgraph cluster_daemon {
+    label="本机 daemon（Hono · 127.0.0.1:3000）";
+    style="rounded,filled";
+    fillcolor="#f0fdf4";
+    color="#16a34a";
+    fontcolor="#16a34a";
+    penwidth=2;
+    labelloc="t";
+
+    rag   [label="RAG 检索\n本地 embedding（常驻内存）", fillcolor="#ffffff", color="#16a34a"];
+    kb    [label="技术栈命令知识库\n（本地缓存）", fillcolor="#ffffff", color="#16a34a"];
+    agent [label="有界 Agent 循环（最多 5 轮）\n\nlist_dir · read_file · query_tech_command", fillcolor="#dcfce7", color="#16a34a", penwidth=2];
+  }
+
+  // ===== 外部依赖 =====
+  deepseek [label="DeepSeek API\nBYOK · key 不出本机", fillcolor="#fef9c3", color="#ca8a04", penwidth=2];
+  supabase [label="云 · Supabase\n共享命令库 / 技术栈命令库", fillcolor="#fdf2f8", color="#db2777", penwidth=2];
+
+  // ===== 数据流 =====
+  cli -> agent      [label=" 意图 + 工作区 "];
+  agent -> cli      [label=" 生成的命令（Tab 补全） ", style=dashed, color="#0284c7", fontcolor="#0284c7", constraint=false];
+  rag -> agent      [label=" 相似命令示例 "];
+  kb -> agent       [label=" 命令模板 "];
+  agent -> deepseek [label=" tool-calling ", dir=both];
+  supabase -> rag   [label=" 启动 / 定时同步 ", style=dashed];
+  supabase -> kb    [label=" 启动 / 定时同步 ", style=dashed];
+}
