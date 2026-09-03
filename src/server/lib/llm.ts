@@ -17,7 +17,7 @@ export interface ProviderMeta {
 // provider 表：内置厂商的 baseURL + 默认 model 都在这里，config 里只存 key。
 // custom 的 baseURL/model 由用户填、存在 config 里，所以这里留空。
 export const PROVIDERS: ProviderMeta[] = [
-  { id: 'deepseek', label: 'DeepSeek', baseURL: 'https://api.deepseek.com', model: 'deepseek-chat' },
+  { id: 'deepseek', label: 'DeepSeek', baseURL: 'https://api.deepseek.com', model: 'deepseek-v4-flash' },
   { id: 'openai', label: 'OpenAI', baseURL: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
   { id: 'kimi', label: 'Kimi (Moonshot)', baseURL: 'https://api.moonshot.cn/v1', model: 'moonshot-v1-8k' },
   { id: 'glm', label: '智谱 GLM', baseURL: 'https://open.bigmodel.cn/api/paas/v4', model: 'glm-4-flash' },
@@ -107,6 +107,9 @@ async function chat(
   messages: ChatMessage[],
   tools?: ToolDefinition[],
 ): Promise<ChatMessage> {
+  // DeepSeek V4 默认开启思考（thinking），function calling 会产出 reasoning_content 拖慢延迟；
+  // 显式禁用思考，让 content 只含正文 + tool_calls（同 dsh 的 serialize.ts 做法）。其他厂商不支持此字段。
+  const isDeepSeek = baseURL.includes('deepseek.com')
   const res = await fetch(`${baseURL}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -117,6 +120,7 @@ async function chat(
       model,
       messages,
       ...(tools && tools.length ? { tools } : {}),
+      ...(isDeepSeek ? { thinking: { type: 'disabled' } } : {}),
       temperature: 0,
     }),
   })
@@ -169,12 +173,19 @@ async function generateWithTools(
 
         // emit_command 是结构化输出：命令从参数里取，绝不混进解释文字，也不走 executeTool
         if (tc.function.name === EMIT_COMMAND_TOOL) {
-          const command = typeof args.command === 'string' ? args.command.trim() : ''
+          const raw = typeof args.command === 'string' ? args.command.trim() : ''
+          // 值校验（同 dsh 的 validateJsonSchemaValue + ToolArgsError 同轮重试）：
+          // 空值、或仍带 markdown 围栏的，判为非法，回错误让模型在同一轮重试。
+          const command = raw && !raw.includes('```') ? raw : ''
           if (command) {
             console.error(`[llm] 最终命令（emit_command）：${command}`)
             return command
           }
-          messages.push({ role: 'tool', tool_call_id: tc.id, content: '错误：command 不能为空，请给出有效命令' })
+          messages.push({
+            role: 'tool',
+            tool_call_id: tc.id,
+            content: '错误：command 必须是单条 shell 命令本身，不能为空，不能带 markdown 代码块围栏或解释文字。请重新调用 emit_command。',
+          })
           continue
         }
 
