@@ -1,0 +1,67 @@
+[
+  {
+    "type": "java",
+    "label": "Java",
+    "detect": ["pom.xml", "build.gradle"],
+    "ops": [
+      { "intent": "打包构建项目", "cmd": "mvn clean package", "params": "" },
+      { "intent": "启动运行 jar", "cmd": "java -jar target/{artifactId}-{version}.jar", "params": "artifactId、version 从 pom.xml 读取" },
+      { "intent": "运行测试", "cmd": "mvn test", "params": "" },
+      { "intent": "安装依赖", "cmd": "mvn install", "params": "" }
+    ]
+  },
+  {
+    "type": "node",
+    "label": "Node.js / 前端",
+    "detect": ["package.json"],
+    "ops": [
+      { "intent": "启动开发服务", "cmd": "npm run dev", "params": "" },
+      { "intent": "构建打包项目", "cmd": "npm run build", "params": "" },
+      { "intent": "运行测试", "cmd": "npm test", "params": "" },
+      { "intent": "安装依赖", "cmd": "npm install", "params": "" }
+    ]
+  },
+  {
+    "type": "python",
+    "label": "Python",
+    "detect": ["pyproject.toml", "requirements.txt", "setup.py"],
+    "ops": [
+      { "intent": "运行程序", "cmd": "python {entry}", "params": "entry 为入口文件，从目录里的 .py 文件名判断" },
+      { "intent": "安装依赖", "cmd": "pip install -r requirements.txt", "params": "" },
+      { "intent": "运行测试", "cmd": "pytest", "params": "" },
+      { "intent": "创建虚拟环境", "cmd": "python -m venv .venv", "params": "" }
+    ]
+  },
+  {
+    "type": "rust",
+    "label": "Rust",
+    "detect": ["Cargo.toml"],
+    "ops": [
+      { "intent": "运行程序", "cmd": "cargo run", "params": "" },
+      { "intent": "构建发布版本", "cmd": "cargo build --release", "params": "" },
+      { "intent": "运行测试", "cmd": "cargo test", "params": "" }
+    ]
+  },
+  {
+    "type": "go",
+    "label": "Go",
+    "detect": ["go.mod"],
+    "ops": [
+      { "intent": "运行程序", "cmd": "go run .", "params": "" },
+      { "intent": "构建打包项目", "cmd": "go build", "params": "" },
+      { "intent": "运行测试", "cmd": "go test ./...", "params": "" },
+      { "intent": "整理依赖", "cmd": "go mod tidy", "params": "" }
+    ]
+  },
+  {
+    "type": "docker",
+    "label": "Docker / 容器部署",
+    "detect": ["Dockerfile", "docker-compose.yml", "docker-compose.yaml"],
+    "ops": [
+      { "intent": "上线部署启动服务", "cmd": "docker compose up -d", "params": "" },
+      { "intent": "构建镜像", "cmd": "docker build -t {image} .", "params": "image 为镜像名，从 README 或项目名判断" },
+      { "intent": "下线停止服务", "cmd": "docker compose down", "params": "" },
+      { "intent": "查看服务日志", "cmd": "docker compose logs -f", "params": "" }
+    ]
+  }
+]

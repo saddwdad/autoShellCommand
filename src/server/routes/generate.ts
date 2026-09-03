@@ -2,6 +2,8 @@
 // key 只在这台机器上（readConfig 读 ~/.autoshell/config.json），不上云、不经过任何外部服务。
 // 常驻进程 = 复用到 DeepSeek 的 TLS 连接，embedding 也一直热着。
 import { Hono } from 'hono'
+import { statSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { readConfig } from '../lib/config'
 import { retrieve } from '../lib/rag'
 import { generateCommand, PROVIDERS } from '../lib/llm'
@@ -16,6 +18,17 @@ generateRoute.post('/', async (c) => {
   const platform = typeof obj.platform === 'string' ? obj.platform : ''
   const shell = typeof obj.shell === 'string' ? obj.shell : ''
   const debug = obj.debug === true
+
+  // 工作区根目录：CLI 端传来的 cwd。校验存在且是目录，否则置空（降级为纯意图生成）。
+  let cwd = typeof obj.cwd === 'string' ? obj.cwd.trim() : ''
+  if (cwd) {
+    try {
+      const abs = resolve(cwd)
+      cwd = statSync(abs).isDirectory() ? abs : ''
+    } catch {
+      cwd = ''
+    }
+  }
 
   if (!intent.trim()) {
     return c.json({ error: '缺少字段：intent' }, 400)
@@ -67,6 +80,7 @@ generateRoute.post('/', async (c) => {
       platform,
       shell,
       examples,
+      cwd,
     )
     return c.json({ command, label, ...(debug ? { examples } : {}) })
   } catch (e) {

@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git checkout *)",
+      "Bash(git fetch *)",
+      "Bash(git branch *)",
+      "Read(//c/Users/lmr20/.ssh/**)",
+      "Bash(ssh-add -l)",
+      "Bash(ssh-keygen -y -P \"\" -f ~/.ssh/id_ed25519)",
+      "Bash(powershell *)",
+      "WebSearch",
+      "Bash(npm run *)",
+      "Bash(node server/node_modules/typescript/bin/tsc -p tsconfig.json --typeRoots server/node_modules/@types)",
+      "Bash(npm ci *)",
+      "Bash(curl -s -m 5 http://127.0.0.1:3000/api/health)",
+      "Bash(curl *)",
+      "Bash(PORT=3001 npx tsx src/server/index.ts)",
+      "Bash(PORT=3002 npx tsx src/server/index.ts)",
+      "Bash(node *)",
+      "Bash(npx tsx *)",
+      "Bash(\"E:/Desktop/项目/autoshell/autoShellCommand/node_modules/.bin/tsx\" \"E:/Desktop/项目/autoshell/autoShellCommand/src/cli/index.ts\" \"运行该项目的新版 ssr 本地开发模式\")",
+      "Bash(taskkill //F //PID 13408 //PID 9200)",
+      "Read(//c/Users/lmr20/**)",
+      "Bash(cmd //c \"rmdir /s /q C:\\\\Users\\\\lmr20\\\\autoshell-test-ssr\")",
+      "Bash(ls -d /c/Users/lmr20/autoshell-test-ssr)"
+    ]
+  }
+}

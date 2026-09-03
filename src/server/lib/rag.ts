@@ -82,6 +82,14 @@ function getExtractor(): Promise<Extractor> {
   return extractorPromise as Promise<Extractor>
 }
 
+// 给外部复用 embedding 的入口（技术栈命令检索等）：批量文本 → 归一化向量。
+// 返回拼接后的 Float32Array，调用方按 `data.length / texts.length` 取维度。
+export async function embedTexts(texts: string[]): Promise<Float32Array> {
+  const extractor = await getExtractor()
+  const t = await extractor(texts, { pooling: 'mean', normalize: true })
+  return t.data as Float32Array
+}
+
 // 启动预热：把模型载入内存。失败不阻断 server 启动，首次 /api/retrieve 会懒加载兜底。
 export function warmUp(): Promise<void> {
   console.error(

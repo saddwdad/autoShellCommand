@@ -161,7 +161,7 @@ async function main(): Promise<void> {
     const res = await fetch(`${DAEMON_URL}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ intent, platform, shell, debug: values.debug === true }),
+      body: JSON.stringify({ intent, platform, shell, debug: values.debug === true, cwd: process.cwd() }),
     })
 
     const data = (await res.json().catch(() => null)) as {
