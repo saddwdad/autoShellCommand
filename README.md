@@ -1,5 +1,9 @@
 # autoshell-ai
 
+<p align="center">
+  <img src="docs/logo.gif" alt="asf：自然语言 → 命令" width="233">
+</p>
+
 在终端里**直接打自然语言 → 按 Tab**，就变成一条可执行的 shell 命令（可选自动执行）。命令名是 `asf`。
 
 - **BYOK**：DeepSeek key 只存在你自己机器上（`~/.autoshell/config.json`），不上云、不经过第三方。

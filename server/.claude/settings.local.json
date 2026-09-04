@@ -31,7 +31,32 @@
       "Bash(scoop --version)",
       "Bash(winget install *)",
       "Bash(\"/c/Program Files/Graphviz/bin/dot.exe\" -Tpng docs/architecture.dot -o docs/architecture.png)",
-      "Bash(\"/c/Program Files/Graphviz/bin/dot.exe\" -Tsvg docs/architecture.dot -o docs/architecture.svg)"
+      "Bash(\"/c/Program Files/Graphviz/bin/dot.exe\" -Tsvg docs/architecture.dot -o docs/architecture.svg)",
+      "Bash(\"/c/Program Files/Graphviz/bin/dot.exe\" -Tpng docs/logo.dot -o docs/logo.png)",
+      "Bash(\"/c/Program Files/Graphviz/bin/dot.exe\" -Tsvg docs/logo.dot -o docs/logo.svg)",
+      "Bash(dot -Tpng docs/logo.dot -o docs/logo.png)",
+      "Bash(dot -Tsvg docs/logo.dot -o docs/logo.svg)",
+      "Read(//c/Program Files/Graphviz/bin/**)",
+      "Read(//c/Program Files \\(x86\\)/Graphviz/bin/**)",
+      "Bash(where dot *)",
+      "Bash(command -v dot.exe)",
+      "Bash(command -v magick)",
+      "Bash(command -v convert)",
+      "Bash(command -v ffmpeg)",
+      "Read(//c/Program Files/**)",
+      "Bash(ffmpeg -y -framerate 3 -i \"docs/logo-frames/f%d.png\" -vf \"split[s0][s1];[s0]palettegen=max_colors=64[p];[s1][p]paletteuse\" -loop 0 \"docs/logo.gif\")",
+      "Bash(rm -f docs/logo-frames/f10.png docs/logo-frames/f11.png)",
+      "Bash(ffmpeg -y -framerate 3 -start_number 0 -i \"docs/logo-frames/f%d.png\" -vf \"split[s0][s1];[s0]palettegen=max_colors=64[p];[s1][p]paletteuse\" -loop 0 \"docs/logo.gif\")",
+      "Bash(\"/c/Program Files/Graphviz/bin/dot.exe\" -Tsvg docs/logo-frames/f5.dot -o docs/logo-frames/f5.svg)",
+      "Bash(\"/c/Program Files/Graphviz/bin/dot.exe\" -Tsvg docs/logo-frames/f0.dot -o docs/logo-frames/f0.svg)",
+      "Bash(\"/c/Program Files/Graphviz/bin/dot.exe\" -Tsvg docs/logo-frames/f4.dot -o docs/logo-frames/f4.svg)",
+      "Bash(\"/c/Program Files/Graphviz/bin/dot.exe\" -Tsvg docs/logo.dot -o /tmp/static.svg)",
+      "Read(//tmp/**)",
+      "Bash(\"/c/Program Files/Graphviz/bin/dot.exe\" -Tsvg docs/logo-frames/f0.dot -o /tmp/f0.svg)",
+      "Bash(\"/c/Program Files/Graphviz/bin/dot.exe\" -Tsvg docs/logo-frames/f7.dot -o /tmp/f7.svg)",
+      "Bash(ls -la *.md docs/*.md)",
+      "Bash(find . -maxdepth 2 -iname \"readme*.md\" -not -path \"*/node_modules/*\")",
+      "Bash(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 docs/logo.gif)"
     ]
   }
 }

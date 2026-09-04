@@ -1,0 +1,31 @@
+// autoshell-ai logo —— 用 Graphviz 渲染：
+//   dot -Tpng docs/logo.dot -o docs/logo.png
+//   dot -Tsvg docs/logo.dot -o docs/logo.svg
+// 主题：一条「自然语言 → 命令」的轻量流水线 —— 跑起来 → ⚡asf → npm run dev。
+digraph logo {
+  graph [bgcolor="transparent", pad="0.25", margin="0", rankdir="LR", nodesep="0.3", ranksep="0.6",
+         label="轻量 · 自然语言 → 命令", labelloc="b", labeljust="c",
+         fontname="Microsoft YaHei", fontsize="12", fontcolor="#64748b"];
+  node [shape="none", margin="0", width="0", height="0", fontname="Microsoft YaHei"];
+  edge [color="#22c55e", arrowsize="1.0", penwidth="2.2"];
+
+  nl [label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="16" STYLE="ROUNDED" BGCOLOR="#334155">
+      <TR><TD><FONT POINT-SIZE="20" COLOR="#e2e8f0">跑起来</FONT></TD></TR>
+    </TABLE>
+  >];
+
+  asf [label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="16" STYLE="ROUNDED" BGCOLOR="#22c55e">
+      <TR><TD><FONT POINT-SIZE="20" COLOR="#f59e0b">⚡</FONT><FONT POINT-SIZE="20" COLOR="#0f172a" FACE="Consolas"> asf</FONT></TD></TR>
+    </TABLE>
+  >];
+
+  cmd [label=<
+    <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="0" CELLPADDING="16" STYLE="ROUNDED" BGCOLOR="#0f172a" COLOR="#334155">
+      <TR><TD><FONT POINT-SIZE="20" COLOR="#22c55e" FACE="Consolas">npm run dev</FONT></TD></TR>
+    </TABLE>
+  >];
+
+  nl -> asf -> cmd;
+}
